@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>پنل فروشندگان بازار هوشمند</title>
+<style>
+body{font-family:Tahoma;background:#f2f5fb;margin:0;color:#202b45}
+header{background:#244bc2;color:white;padding:22px;text-align:center}
+main{max-width:650px;margin:25px auto;padding:15px}
+.box{background:white;padding:22px;border-radius:16px;margin-bottom:18px;box-shadow:0 3px 15px #ddd}
+h2{color:#244bc2}
+input,select{width:100%;padding:13px;margin:8px 0 15px;border:1px solid #ddd;border-radius:9px;box-sizing:border-box}
+button{background:#3157d5;color:white;border:0;padding:13px 20px;border-radius:9px;width:100%;font-size:16px}
+button.secondary{background:#e8edff;color:#244bc2}
+.hidden{display:none}
+.message{padding:12px;background:#e5f7ed;color:#176b43;border-radius:9px;margin-top:12px}
+</style>
+</head>
+<body>
+
+<header>
+<h1>بازار هوشمند</h1>
+<p>پنل اختصاصی فروشندگان</p>
+</header>
+
+<main>
+
+<section id="register" class="box">
+<h2>ثبت‌نام فروشنده</h2>
+<form id="registerForm">
+<label>نام و نام خانوادگی</label>
+<input id="name" required>
+
+<label>نام فروشگاه</label>
+<input id="store" required>
+
+<label>شماره تماس</label>
+<input id="phone" required>
+
+<label>دسته‌بندی فروشگاه</label>
+<select id="category" required>
+<option value="">انتخاب دسته‌بندی</option>
+<option>موبایل و دیجیتال</option>
+<option>پوشاک</option>
+<option>خانه و آشپزخانه</option>
+<option>زیبایی و سلامت</option>
+<option>سایر کالاها</option>
+</select>
+
+<label>رمز آزمایشی</label>
+<input id="password" type="password" required minlength="4">
+
+<button type="submit">ثبت‌نام</button>
+</form>
+</section>
+
+<section id="login" class="box">
+<h2>ورود فروشنده</h2>
+<input id="loginPhone" placeholder="شماره تماس">
+<input id="loginPassword" type="password" placeholder="رمز آزمایشی">
+<button id="loginButton">ورود به پنل</button>
+</section>
+
+<section id="dashboard" class="box hidden">
+<h2>پنل فروشنده</h2>
+<p id="welcome"></p>
+<hr>
+<h3>مدیریت فروشگاه</h3>
+<p>تعداد سفارش‌ها: ۰</p>
+<p>تعداد محصولات: ۰</p>
+<p>وضعیت فروشگاه: آزمایشی</p>
+<button class="secondary" id="logout">خروج از حساب</button>
+</section>
+
+<div id="message"></div>
+
+</main>
+
+<script>
+const key="smartBazaarSeller";
+const $=id=>document.getElementById(id);
+
+$("registerForm").onsubmit=function(e){
+e.preventDefault();
+const seller={
+name:$("name").value.trim(),
+store:$("store").value.trim(),
+phone:$("phone").value.trim(),
+category:$("category").value,
+password:$("password").value
+};
+try{
+localStorage.setItem(key,JSON.stringify(seller));
+$("message").innerHTML='<div class="message">ثبت‌نام آزمایشی انجام شد. حالا وارد شو.</div>';
+$("loginPhone").value=seller.phone;
+}catch(e){
+$("message").textContent="ذخیره‌سازی در این مرورگر امکان‌پذیر نیست.";
+}
+};
+
+$("loginButton").onclick=function(){
+let seller;
+try{seller=JSON.parse(localStorage.getItem(key));}catch(e){}
+if(!seller){
+$("message").textContent="ابتدا ثبت‌نام کن.";
+return;
+}
+if($("loginPhone").value.trim()!==seller.phone ||
+$("loginPassword").value!==seller.password){
+$("message").textContent="شماره یا رمز اشتباه است.";
+return;
+}
+$("register").classList.add("hidden");
+$("login").classList.add("hidden");
+$("dashboard").classList.remove("hidden");
+$("welcome").textContent="خوش آمدی "+seller.name+"، فروشگاه "+seller.store;
+$("message").textContent="";
+};
+
+$("logout").onclick=function(){
+$("dashboard").classList.add("hidden");
+$("register").classList.remove("hidden");
+$("login").classList.remove("hidden");
+};
+</script>
+
+</body>
+</html>
