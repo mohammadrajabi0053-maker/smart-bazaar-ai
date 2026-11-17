@@ -13,7 +13,120 @@ header p{margin:0}
 .search{padding:18px;text-align:center}
 input{width:90%;max-width:500px;padding:13px;border:1px solid #ccc;border-radius:10px;font-size:16px}
 h2{text-align:center;color:#087f5b}
-.categories{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;padding:10px}
+.categories{display:flex;justify-content:center;flex-<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بازار هوشمند</title>
+<style>
+body{font-family:Tahoma,Arial;background:#f4f6f9;margin:0;color:#222}
+header{background:#174ea6;color:white;padding:22px;text-align:center}
+nav{padding:15px;text-align:center;background:white}
+input,select{padding:12px;margin:5px;border:1px solid #ccc;border-radius:8px}
+main{padding:18px;max-width:1100px;margin:auto}
+.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:15px}
+.card{background:white;border-radius:12px;padding:14px;box-shadow:0 2px 8px #ddd}
+.card img{width:100%;height:160px;object-fit:contain}
+.price{color:#16834a;font-weight:bold}
+button{background:#174ea6;color:white;border:0;padding:12px 18px;border-radius:8px}
+a{color:white}
+</style>
+</head>
+<body>
+
+<header>
+<h1>بازار هوشمند</h1>
+<p>بازار آنلاین چندفروشندگی</p>
+<a href="Seller.html">ورود به پنل فروشندگان</a>
+</header>
+
+<nav>
+<input id="search" placeholder="جست‌وجوی محصول">
+<select id="category">
+<option value="">همه دسته‌ها</option>
+<option>موبایل</option>
+<option>لوازم خانگی</option>
+<option>پوشاک</option>
+<option>دیجیتال</option>
+<option>سایر</option>
+</select>
+<button onclick="showProducts()">جست‌وجو</button>
+</nav>
+
+<main>
+<h2>محصولات فروشگاه</h2>
+<div id="products" class="products"></div>
+<p id="empty"></p>
+</main>
+
+<script>
+const STORAGE_KEY = "smartBazaarProducts";
+
+function getProducts(){
+ try{
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+ }catch(e){
+  return [];
+ }
+}
+
+function showProducts(){
+ const list = getProducts();
+ const search = document.getElementById("search").value.trim().toLowerCase();
+ const category = document.getElementById("category").value;
+ const box = document.getElementById("products");
+ const empty = document.getElementById("empty");
+
+ box.innerHTML = "";
+
+ const filtered = list.filter(p =>
+  (!search || (p.name || "").toLowerCase().includes(search) ||
+   (p.description || "").toLowerCase().includes(search)) &&
+  (!category || p.category === category)
+ );
+
+ if(filtered.length === 0){
+  empty.textContent = "هنوز محصولی ثبت نشده است.";
+  return;
+ }
+
+ empty.textContent = "";
+
+ filtered.forEach(p=>{
+  const card = document.createElement("div");
+  card.className = "card";
+
+  const img = document.createElement("img");
+  img.src = p.image || "";
+  img.alt = p.name || "محصول";
+  img.onerror = ()=>{img.style.display="none";};
+
+  const title = document.createElement("h3");
+  title.textContent = p.name || "بدون نام";
+
+  const desc = document.createElement("p");
+  desc.textContent = p.description || "";
+
+  const price = document.createElement("p");
+  price.className = "price";
+  price.textContent = Number(p.price || 0).toLocaleString("fa-IR") + " تومان";
+
+  const stock = document.createElement("p");
+  stock.textContent = "موجودی: " + (p.stock ?? 0);
+
+  card.append(img,title,desc,price,stock);
+  box.appendChild(card);
+ });
+}
+
+showProducts();
+
+window.addEventListener("storage",showProducts);
+</script>
+
+</body>
+</html>:wrap;gap:10px;padding:10px}
 .categories button{border:0;background:#d8f3e8;color:#087f5b;padding:12px 18px;border-radius:20px;font-size:15px}
 .products{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:14px;padding:15px}
 .card{background:white;border-radius:12px;padding:15px;text-align:center;box-shadow:0 2px 8px #0001}
