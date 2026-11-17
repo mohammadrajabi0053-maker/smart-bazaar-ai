@@ -3,126 +3,302 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>پنل فروشندگان بازار هوشمند</title>
+<title>بازار هوشمند - پنل فروشنده</title>
 <style>
-body{font-family:Tahoma;background:#f2f5fb;margin:0;color:#202b45}
+body{font-family:Tahoma,Arial;background:#f2f5fb;margin:0;color:#24304a}
 header{background:#244bc2;color:white;padding:22px;text-align:center}
-main{max-width:650px;margin:25px auto;padding:15px}
-.box{background:white;padding:22px;border-radius:16px;margin-bottom:18px;box-shadow:0 3px 15px #ddd}
+main{max-width:850px;margin:20px auto;padding:15px}
+.box{background:white;padding:20px;border-radius:14px;margin-bottom:18px;box-shadow:0 2px 12px #ddd}
 h2{color:#244bc2}
-input,select{width:100%;padding:13px;margin:8px 0 15px;border:1px solid #ddd;border-radius:9px;box-sizing:border-box}
-button{background:#3157d5;color:white;border:0;padding:13px 20px;border-radius:9px;width:100%;font-size:16px}
-button.secondary{background:#e8edff;color:#244bc2}
-.hidden{display:none}
-.message{padding:12px;background:#e5f7ed;color:#176b43;border-radius:9px;margin-top:12px}
+input,textarea,select{width:100%;box-sizing:border-box;padding:12px;margin:8px 0 15px;border:1px solid #ccc;border-radius:8px;font:inherit}
+button{background:#3157d5;color:white;border:0;padding:12px 18px;border-radius:8px;font:inherit;cursor:pointer;margin:4px}
+.delete{background:#b52b38}
+.product{border:1px solid #ddd;border-radius:12px;padding:14px;margin:12px 0}
+.product img{width:100%;max-width:220px;border-radius:10px;display:block}
+.small{color:#65718a;font-size:13px}
 </style>
 </head>
 <body>
 
 <header>
-<h1>بازار هوشمند</h1>
-<p>پنل اختصاصی فروشندگان</p>
+<h1 id="brand">بازار هوشمند</h1>
+<p id="subtitle">پنل اختصاصی فروشندگان</p>
+<select id="language" style="max-width:220px">
+<option value="fa">فارسی</option>
+<option value="en">English</option>
+<option value="ar">العربية</option>
+<option value="zh">中文</option>
+</select>
 </header>
 
 <main>
+<section class="box">
+<h2 id="profileTitle">اطلاعات فروشگاه</h2>
+<label id="storeLabel">نام فروشگاه</label>
+<input id="storeName" placeholder="نام فروشگاه">
+<button id="saveStore">ذخیره نام فروشگاه</button>
+</section>
 
-<section id="register" class="box">
-<h2>ثبت‌نام فروشنده</h2>
-<form id="registerForm">
-<label>نام و نام خانوادگی</label>
-<input id="name" required>
+<section class="box">
+<h2 id="addTitle">ثبت محصول جدید</h2>
+<p class="small" id="limit">حداکثر ۱۰ محصول آزمایشی</p>
 
-<label>نام فروشگاه</label>
-<input id="store" required>
+<form id="productForm">
+<label id="nameLabel">نام محصول</label>
+<input id="productName" required>
 
-<label>شماره تماس</label>
-<input id="phone" required>
+<label id="descLabel">توضیحات محصول</label>
+<textarea id="description" rows="3"></textarea>
 
-<label>دسته‌بندی فروشگاه</label>
-<select id="category" required>
-<option value="">انتخاب دسته‌بندی</option>
-<option>موبایل و دیجیتال</option>
-<option>پوشاک</option>
-<option>خانه و آشپزخانه</option>
-<option>زیبایی و سلامت</option>
-<option>سایر کالاها</option>
-</select>
+<label id="priceLabel">قیمت</label>
+<input id="price" type="number" min="0" required>
 
-<label>رمز آزمایشی</label>
-<input id="password" type="password" required minlength="4">
+<label id="stockLabel">موجودی</label>
+<input id="stock" type="number" min="0" required>
 
-<button type="submit">ثبت‌نام</button>
+<label id="discountLabel">تخفیف درصدی</label>
+<input id="discount" type="number" min="0" max="100" value="0">
+
+<label id="imageLabel">نشانی تصویر محصول</label>
+<input id="image" type="url" placeholder="https://example.com/image.jpg">
+
+<button type="submit" id="submitButton">ثبت محصول</button>
+<button type="button" id="cancelEdit" style="display:none">لغو ویرایش</button>
 </form>
-</section>
-
-<section id="login" class="box">
-<h2>ورود فروشنده</h2>
-<input id="loginPhone" placeholder="شماره تماس">
-<input id="loginPassword" type="password" placeholder="رمز آزمایشی">
-<button id="loginButton">ورود به پنل</button>
-</section>
-
-<section id="dashboard" class="box hidden">
-<h2>پنل فروشنده</h2>
-<p id="welcome"></p>
-<hr>
-<h3>مدیریت فروشگاه</h3>
-<p>تعداد سفارش‌ها: ۰</p>
-<p>تعداد محصولات: ۰</p>
-<p>وضعیت فروشگاه: آزمایشی</p>
-<button class="secondary" id="logout">خروج از حساب</button>
-</section>
-
 <div id="message"></div>
+</section>
 
+<section class="box">
+<h2 id="productsTitle">محصولات فروشگاه</h2>
+<div id="products"></div>
+</section>
+
+<section class="box">
+<h2 id="futureTitle">امکانات تکمیلی</h2>
+<p id="futureText">
+مدیریت سفارش‌ها، تبلیغات هوشمند چهارزبانه،
+باشگاه مشتریان، تخفیفات ویژه و ارتباط با مدیر
+در مراحل بعدی به سیستم متصل خواهند شد.
+</p>
+</section>
 </main>
 
 <script>
-const key="smartBazaarSeller";
+const translations={
+fa:{
+dir:"rtl",subtitle:"پنل اختصاصی فروشندگان",
+profile:"اطلاعات فروشگاه",store:"نام فروشگاه",
+save:"ذخیره نام فروشگاه",add:"ثبت محصول جدید",
+limit:"حداکثر ۱۰ محصول آزمایشی",name:"نام محصول",
+desc:"توضیحات محصول",price:"قیمت",stock:"موجودی",
+discount:"تخفیف درصدی",image:"نشانی تصویر محصول",
+submit:"ثبت محصول",products:"محصولات فروشگاه",
+future:"امکانات تکمیلی",
+futureText:"مدیریت سفارش‌ها، تبلیغات هوشمند چهارزبانه، باشگاه مشتریان، تخفیفات ویژه و ارتباط با مدیر در مراحل بعدی به سیستم متصل خواهند شد.",
+edit:"ویرایش",remove:"حذف",empty:"هنوز محصولی ثبت نشده است.",
+saved:"ذخیره شد.",full:"حداکثر ۱۰ محصول می‌توان ثبت کرد.",
+priceText:"قیمت",stockText:"موجودی",discountText:"تخفیف"
+},
+en:{
+dir:"ltr",subtitle:"Seller Dashboard",
+profile:"Store Information",store:"Store Name",
+save:"Save Store Name",add:"Add New Product",
+limit:"Maximum 10 demo products",name:"Product Name",
+desc:"Product Description",price:"Price",stock:"Stock",
+discount:"Discount Percentage",image:"Product Image URL",
+submit:"Add Product",products:"Store Products",
+future:"Coming Features",
+futureText:"Order management, four-language AI advertising, loyalty program, special discounts and admin communication will be connected in later stages.",
+edit:"Edit",remove:"Delete",empty:"No products yet.",
+saved:"Saved.",full:"You can add up to 10 products.",
+priceText:"Price",stockText:"Stock",discountText:"Discount"
+},
+ar:{
+dir:"rtl",subtitle:"لوحة تحكم البائع",
+profile:"معلومات المتجر",store:"اسم المتجر",
+save:"حفظ اسم المتجر",add:"إضافة منتج جديد",
+limit:"الحد الأقصى 10 منتجات تجريبية",name:"اسم المنتج",
+desc:"وصف المنتج",price:"السعر",stock:"المخزون",
+discount:"نسبة الخصم",image:"رابط صورة المنتج",
+submit:"إضافة المنتج",products:"منتجات المتجر",
+future:"ميزات قادمة",
+futureText:"ستتم إضافة إدارة الطلبات والإعلانات الذكية بأربع لغات وبرنامج الولاء والخصومات والتواصل مع الإدارة في المراحل القادمة.",
+edit:"تعديل",remove:"حذف",empty:"لا توجد منتجات بعد.",
+saved:"تم الحفظ.",full:"يمكنك إضافة 10 منتجات كحد أقصى.",
+priceText:"السعر",stockText:"المخزون",discountText:"الخصم"
+},
+zh:{
+dir:"ltr",subtitle:"卖家管理面板",
+profile:"店铺信息",store:"店铺名称",
+save:"保存店铺名称",add:"添加新商品",
+limit:"最多可添加10件演示商品",name:"商品名称",
+desc:"商品描述",price:"价格",stock:"库存",
+discount:"折扣百分比",image:"商品图片链接",
+submit:"添加商品",products:"店铺商品",
+future:"后续功能",
+futureText:"订单管理、四种语言的智能广告、会员积分、特别优惠和管理员沟通将在后续阶段接入。",
+edit:"编辑",remove:"删除",empty:"暂无商品。",
+saved:"已保存。",full:"最多可以添加10件商品。",
+priceText:"价格",stockText:"库存",discountText:"折扣"
+}
+};
+
 const $=id=>document.getElementById(id);
+const storageKey="smartBazaarProducts";
+let products=[];
+let editing=null;
+let lang="fa";
 
-$("registerForm").onsubmit=function(e){
-e.preventDefault();
-const seller={
-name:$("name").value.trim(),
-store:$("store").value.trim(),
-phone:$("phone").value.trim(),
-category:$("category").value,
-password:$("password").value
-};
 try{
-localStorage.setItem(key,JSON.stringify(seller));
-$("message").innerHTML='<div class="message">ثبت‌نام آزمایشی انجام شد. حالا وارد شو.</div>';
-$("loginPhone").value=seller.phone;
+products=JSON.parse(localStorage.getItem(storageKey)||"[]");
+if(!Array.isArray(products))products=[];
+}catch(e){products=[];}
+
+function save(){
+try{
+localStorage.setItem(storageKey,JSON.stringify(products));
 }catch(e){
-$("message").textContent="ذخیره‌سازی در این مرورگر امکان‌پذیر نیست.";
+$("message").textContent="ذخیره‌سازی در مرورگر ممکن نیست.";
 }
-};
+}
 
-$("loginButton").onclick=function(){
-let seller;
-try{seller=JSON.parse(localStorage.getItem(key));}catch(e){}
-if(!seller){
-$("message").textContent="ابتدا ثبت‌نام کن.";
+function render(){
+const t=translations[lang];
+document.documentElement.lang=lang;
+document.documentElement.dir=t.dir;
+$("subtitle").textContent=t.subtitle;
+$("profileTitle").textContent=t.profile;
+$("storeLabel").textContent=t.store;
+$("saveStore").textContent=t.save;
+$("addTitle").textContent=t.add;
+$("limit").textContent=t.limit;
+$("nameLabel").textContent=t.name;
+$("descLabel").textContent=t.desc;
+$("priceLabel").textContent=t.price;
+$("stockLabel").textContent=t.stock;
+$("discountLabel").textContent=t.discount;
+$("imageLabel").textContent=t.image;
+$("submitButton").textContent=t.submit;
+$("productsTitle").textContent=t.products;
+$("futureTitle").textContent=t.future;
+$("futureText").textContent=t.futureText;
+$("cancelEdit").textContent=t.edit+" ×";
+
+$("products").innerHTML="";
+if(products.length===0){
+$("products").textContent=t.empty;
 return;
 }
-if($("loginPhone").value.trim()!==seller.phone ||
-$("loginPassword").value!==seller.password){
-$("message").textContent="شماره یا رمز اشتباه است.";
-return;
+
+products.forEach((p,i)=>{
+const div=document.createElement("div");
+div.className="product";
+const title=document.createElement("h3");
+title.textContent=p.name;
+div.appendChild(title);
+
+if(p.image){
+const img=document.createElement("img");
+img.src=p.image;
+img.alt=p.name;
+img.onerror=()=>img.style.display="none";
+div.appendChild(img);
 }
-$("register").classList.add("hidden");
-$("login").classList.add("hidden");
-$("dashboard").classList.remove("hidden");
-$("welcome").textContent="خوش آمدی "+seller.name+"، فروشگاه "+seller.store;
-$("message").textContent="";
+
+const desc=document.createElement("p");
+desc.textContent=p.description||"";
+div.appendChild(desc);
+
+const info=document.createElement("p");
+info.textContent=
+t.priceText+": "+p.price+
+" | "+t.stockText+": "+p.stock+
+" | "+t.discountText+": "+p.discount+"%";
+div.appendChild(info);
+
+const edit=document.createElement("button");
+edit.textContent=t.edit;
+edit.onclick=()=>editProduct(i);
+div.appendChild(edit);
+
+const del=document.createElement("button");
+del.textContent=t.remove;
+del.className="delete";
+del.onclick=()=>{
+if(confirm(t.remove+"?")){
+products.splice(i,1);
+save();
+render();
+}
+};
+div.appendChild(del);
+$("products").appendChild(div);
+});
+}
+
+$("language").onchange=e=>{
+lang=e.target.value;
+render();
 };
 
-$("logout").onclick=function(){
-$("dashboard").classList.add("hidden");
-$("register").classList.remove("hidden");
-$("login").classList.remove("hidden");
+$("saveStore").onclick=()=>{
+localStorage.setItem("smartBazaarStore", $("storeName").value);
+$("message").textContent=translations[lang].saved;
 };
+
+function editProduct(i){
+const p=products[i];
+editing=i;
+$("productName").value=p.name;
+$("description").value=p.description;
+$("price").value=p.price;
+$("stock").value=p.stock;
+$("discount").value=p.discount;
+$("image").value=p.image||"";
+$("submitButton").textContent=translations[lang].edit;
+$("cancelEdit").style.display="inline-block";
+}
+
+$("cancelEdit").onclick=()=>{
+editing=null;
+$("productForm").reset();
+$("cancelEdit").style.display="none";
+$("submitButton").textContent=translations[lang].submit;
+};
+
+$("productForm").onsubmit=e=>{
+e.preventDefault();
+const item={
+name:$("productName").value.trim(),
+description:$("description").value.trim(),
+price:Number($("price").value),
+stock:Number($("stock").value),
+discount:Number($("discount").value),
+image:$("image").value.trim()
+};
+
+if(item.discount<0||item.discount>100)return;
+if(editing===null){
+if(products.length>=10){
+$("message").textContent=translations[lang].full;
+return;
+}
+products.push(item);
+}else{
+products[editing]=item;
+editing=null;
+$("cancelEdit").style.display="none";
+}
+
+save();
+$("productForm").reset();
+$("submitButton").textContent=translations[lang].submit;
+$("message").textContent=translations[lang].saved;
+render();
+};
+
+$("storeName").value=localStorage.getItem("smartBazaarStore")||"";
+render();
 </script>
 
 </body>
