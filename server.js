@@ -48,7 +48,10 @@ const toNumber = (value, fallback = 0) => {
 };
 
 const clampInt = (value, min, max, fallback) => {
-  const n = Math.trunc(toNumber(value, fallback));
+  // مقدار خالی یا نامعتبر باید پیش‌فرض بگیرد؛ toNumber('') صفر برمی‌گرداند
+  const raw = String(value ?? '').trim();
+  if (raw === '') return fallback;
+  const n = Math.trunc(toNumber(raw, NaN));
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, n));
 };
