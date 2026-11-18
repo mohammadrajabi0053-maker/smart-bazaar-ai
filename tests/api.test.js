@@ -55,7 +55,8 @@ test('سلامت سرویس و متادیتای چهارزبانه', async () =>
 
   const meta = await anon('/api/meta');
   assert.equal(meta.status, 200);
-  assert.deepEqual(meta.json.languages.map((l) => l.code).sort(), ['ar', 'en', 'fa', 'tr']);
+  const codes = meta.json.languages.map((l) => (typeof l === 'string' ? l : l.code)).sort();
+  assert.deepEqual(codes, ['ar', 'en', 'fa', 'tr']);
   assert.ok(meta.json.categories.length >= 5, 'دسته‌بندی‌ها باید تعریف شده باشند');
   assert.ok(meta.json.categories.every((c) => c.fa && c.en && c.ar && c.tr), 'هر دسته باید چهار زبان داشته باشد');
   assert.ok(Array.isArray(meta.json.demoAccounts) && meta.json.demoAccounts.length > 0);
@@ -199,7 +200,16 @@ test('فروشنده کالا ثبت و ویرایش می‌کند و مشتری
 });
 
 test('ابزارهای هوش مصنوعی پاسخ معتبر می‌دهند', async () => {
-  const describe = await anon('/api/ai/describe', {
+  const meta = (await anon('/api/meta')).json;
+  const sellerAccount = meta.demoAccounts.find((a) => a.role === 'seller');
+  const seller = client();
+  const login = await seller('/api/auth/login', {
+    method: 'POST',
+    body: { email: sellerAccount.email, password: sellerAccount.password },
+  });
+  assert.equal(login.status, 200);
+
+  const describe = await seller('/api/ai/describe', {
     method: 'POST',
     body: { name: 'ساعت هوشمند', category: 'digital', features: ['ضدآب', 'GPS'], tone: 'friendly', lang: 'fa' },
   });
@@ -207,7 +217,7 @@ test('ابزارهای هوش مصنوعی پاسخ معتبر می‌دهند',
   assert.ok(describe.json.text.length > 40);
   assert.ok(['local', 'provider'].includes(describe.json.engine));
 
-  const price = await anon('/api/ai/price', {
+  const price = await seller('/api/ai/price', {
     method: 'POST',
     body: { name: 'ساعت هوشمند', category: 'digital', cost: 1000000 },
   });
@@ -215,7 +225,7 @@ test('ابزارهای هوش مصنوعی پاسخ معتبر می‌دهند',
   assert.ok(price.json.recommended >= price.json.low);
   assert.ok(price.json.high >= price.json.recommended);
 
-  const keywords = await anon('/api/ai/keywords', {
+  const keywords = await seller('/api/ai/keywords', {
     method: 'POST',
     body: { name: 'ساعت هوشمند', description: 'ساعت هوشمند ضدآب با GPS و باتری بلندمدت', category: 'digital', lang: 'fa' },
   });
