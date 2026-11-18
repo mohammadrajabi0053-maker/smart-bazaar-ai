@@ -69,8 +69,10 @@ export function scoreProduct(product, query) {
   const q = normalize(query);
   if (!q) return 0;
   const qTokens = tokens(query);
+  const localizedNames = Object.values(product.i18n || {}).filter(Boolean).join(' ');
   const fields = [
     { text: normalize(product.name), weight: 6 },
+    { text: normalize(localizedNames), weight: 6 },
     { text: normalize((product.tags || []).join(' ')), weight: 4 },
     { text: normalize(product.storeName || ''), weight: 3 },
     { text: normalize(product.category || ''), weight: 2 },
