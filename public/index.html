@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="بازار هوشمند — فروشگاه اینترنتی چندفروشندگی با دستیار هوشمند، چهار زبان و پنل فروشندگان">
+<title>بازار هوشمند | فروشگاه چندفروشندگی</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛍️</text></svg>">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-row">
+    <a class="brand" href="/">
+      <span class="logo">🛍️</span>
+      <span class="name" data-i18n="brand">بازار هوشمند</span>
+    </a>
+
+    <div class="search-wrap">
+      <input id="searchInput" type="search" autocomplete="off" data-i18n-ph="search_ph" placeholder="جست‌وجوی کالا، فروشگاه یا دسته‌بندی…" aria-label="جست‌وجو">
+      <div class="suggestions" id="suggestions" hidden></div>
+    </div>
+
+    <div class="header-actions">
+      <select id="langSelect" class="lang-select" aria-label="زبان">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+      <button class="icon-btn" id="aiBtn" type="button" title="دستیار هوشمند">🤖<span class="mobile-hide" data-i18n="ai_assistant">دستیار</span></button>
+      <button class="icon-btn" id="accountBtn" type="button">👤<span id="accountLabel" data-i18n="login">ورود</span></button>
+      <button class="icon-btn" id="cartBtn" type="button">🛒<span data-i18n="cart">سبد</span><span class="badge" id="cartCount" hidden>0</span></button>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <h1 data-i18n="hero_title">از فروشندگان واقعی، هوشمند خرید کن</h1>
+    <p data-i18n="hero_sub">هزاران کالا در چهار زبان، جست‌وجوی معنایی و پنل اختصاصی فروشندگان</p>
+    <div class="hero-actions">
+      <button class="btn" id="heroAi" type="button">🤖 <span data-i18n="ai_assistant">دستیار هوشمند</span></button>
+      <a class="btn ghost" href="/seller"><span data-i18n="seller_panel">پنل فروشنده</span> ↗</a>
+    </div>
+  </div>
+</section>
+
+<main class="container">
+  <div class="layout">
+    <aside class="panel filters" id="filtersPanel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h3 style="margin:0" data-i18n="filters">فیلترها</h3>
+        <button class="btn secondary small filter-toggle" id="filterToggle" type="button">☰</button>
+      </div>
+
+      <div class="collapsible" style="margin-top:12px">
+        <div class="field">
+          <label for="sortSelect" data-i18n="sort">ترتیب</label>
+          <select id="sortSelect">
+            <option value="newest" data-i18n="newest">جدیدترین</option>
+            <option value="popular" data-i18n="popular">پرفروش‌ترین</option>
+            <option value="price_asc" data-i18n="price_asc">ارزان‌ترین</option>
+            <option value="price_desc" data-i18n="price_desc">گران‌ترین</option>
+            <option value="rating" data-i18n="rating_sort">بیشترین امتیاز</option>
+          </select>
+        </div>
+
+        <h3 data-i18n="categories">دسته‌بندی‌ها</h3>
+        <div class="chips" id="catChips"></div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="priceMin" data-i18n="price_from">قیمت از</label>
+            <input id="priceMin" type="number" min="0" step="1000" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="priceTo" data-i18n="price_to">قیمت تا</label>
+            <input id="priceTo" type="number" min="0" step="1000" inputmode="numeric">
+          </div>
+        </div>
+
+        <label class="check" style="margin-bottom:10px">
+          <input id="inStock" type="checkbox">
+          <span data-i18n="in_stock_only">فقط موجود</span>
+        </label>
+
+        <div style="display:flex;gap:6px">
+          <button class="btn block" id="applyFilters" type="button" data-i18n="apply">اعمال</button>
+          <button class="btn secondary block" id="resetFilters" type="button" data-i18n="reset">پاک کردن</button>
+        </div>
+
+        <div id="storeList" style="margin-top:14px"></div>
+      </div>
+    </aside>
+
+    <section>
+      <div class="results-bar">
+        <span id="resultsInfo" data-i18n="loading">در حال بارگذاری…</span>
+        <button class="btn secondary small" id="aiSearchHint" type="button">🤖 <span data-i18n="ai_assistant">دستیار</span></button>
+      </div>
+      <div class="grid" id="grid" aria-live="polite"></div>
+      <div style="text-align:center;margin-top:16px">
+        <button class="btn secondary" id="loadMore" type="button" hidden>بیشتر</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4 data-i18n="brand">بازار هوشمند</h4>
+        <p style="font-size:13px;margin:0" data-i18n="tagline">فروشگاه چندفروشندگی با دستیار هوشمند</p>
+        <p class="hint" style="color:#9fc">appjet branch preview</p>
+      </div>
+      <div>
+        <h4 data-i18n="categories">دسته‌بندی‌ها</h4>
+        <ul id="footerCats"></ul>
+      </div>
+      <div>
+        <h4 data-i18n="account">حساب من</h4>
+        <ul>
+          <li><a href="#" id="footOrders" data-i18n="my_orders">سفارش‌های من</a></li>
+          <li><a href="/seller" data-i18n="seller_panel">پنل فروشنده</a></li>
+          <li><a href="/admin" data-i18n="admin_panel">پنل مدیریت</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 data-i18n="demo_accounts">حساب‌های نمونه</h4>
+        <ul id="demoAccounts" style="font-size:12px;direction:ltr;text-align:left"></ul>
+      </div>
+    </div>
+    <div class="copy">© <span id="year"></span> — <span data-i18n="brand">بازار هوشمند</span></div>
+  </div>
+</footer>
+
+<!-- مودال محصول -->
+<div class="overlay" id="productModal" aria-hidden="true">
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
+    <div class="modal-head">
+      <h2 id="pmTitle">—</h2>
+      <button class="x-btn" type="button" data-close="productModal" aria-label="بستن">✕</button>
+    </div>
+    <div id="pmBody"></div>
+  </div>
+</div>
+
+<!-- کشوی سبد خرید -->
+<aside class="drawer" id="cartDrawer" aria-hidden="true" aria-label="سبد خرید">
+  <div class="drawer-head">
+    <strong data-i18n="cart">سبد خرید</strong>
+    <button class="x-btn" type="button" data-close-drawer="cartDrawer" aria-label="بستن">✕</button>
+  </div>
+  <div class="drawer-body" id="cartItems"></div>
+  <div class="drawer-foot" id="cartFoot"></div>
+</aside>
+
+<!-- مودال پرداخت -->
+<div class="overlay" id="checkoutModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 data-i18n="checkout">ثبت سفارش</h2>
+      <button class="x-btn" type="button" data-close="checkoutModal" aria-label="بستن">✕</button>
+    </div>
+    <form id="checkoutForm">
+      <div class="field-row">
+        <div class="field"><label for="coName" data-i18n="full_name">نام و نام خانوادگی</label><input id="coName" name="fullName" required></div>
+        <div class="field"><label for="coPhone" data-i18n="phone">شماره تماس</label><input id="coPhone" name="phone" inputmode="tel" required></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="coCity" data-i18n="city">شهر</label><input id="coCity" name="city" required></div>
+        <div class="field"><label for="coPostal" data-i18n="postal_code">کد پستی</label><input id="coPostal" name="postalCode" inputmode="numeric"></div>
+      </div>
+      <div class="field"><label for="coAddress" data-i18n="address">نشانی کامل</label><textarea id="coAddress" name="address" required></textarea></div>
+      <div class="field"><label for="coNote" data-i18n="order_note">توضیح سفارش (اختیاری)</label><input id="coNote" name="note"></div>
+      <div id="checkoutSummary" style="margin:10px 0"></div>
+      <button class="btn block" type="submit" data-i18n="place_order">پرداخت و ثبت نهایی</button>
+    </form>
+  </div>
+</div>
+
+<!-- مودال حساب -->
+<div class="overlay" id="authModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="authTitle" data-i18n="login">ورود</h2>
+      <button class="x-btn" type="button" data-close="authModal" aria-label="بستن">✕</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" id="tabLogin" type="button" data-i18n="login">ورود</button>
+      <button class="tab" id="tabRegister" type="button" data-i18n="register">ثبت‌نام</button>
+    </div>
+    <form id="authForm">
+      <div class="field" id="nameField" hidden><label for="auName" data-i18n="name">نام</label><input id="auName" name="name" autocomplete="name"></div>
+      <div class="field"><label for="auEmail" data-i18n="email">ایمیل</label><input id="auEmail" name="email" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="auPass" data-i18n="password">رمز عبور</label><input id="auPass" name="password" type="password" autocomplete="current-password" minlength="8" required></div>
+      <div class="field" id="roleField" hidden>
+        <label data-i18n="account">نوع حساب</label>
+        <select id="auRole" name="role">
+          <option value="customer" data-i18n="as_customer">خریدار</option>
+          <option value="seller" data-i18n="as_seller">فروشنده</option>
+        </select>
+      </div>
+      <div class="field" id="storeField" hidden><label for="auStore" data-i18n="store_name">نام فروشگاه</label><input id="auStore" name="storeName"></div>
+      <button class="btn block" type="submit" data-i18n="submit">تأیید</button>
+      <p class="hint" style="margin-top:8px" id="authHint"></p>
+    </form>
+  </div>
+</div>
+
+<!-- مودال سفارش‌های من -->
+<div class="overlay" id="ordersModal" aria-hidden="true">
+  <div class="modal wide" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 data-i18n="my_orders">سفارش‌های من</h2>
+      <button class="x-btn" type="button" data-close="ordersModal" aria-label="بستن">✕</button>
+    </div>
+    <div id="ordersBody"></div>
+  </div>
+</div>
+
+<!-- کشوی دستیار هوشمند -->
+<aside class="drawer" id="aiDrawer" aria-hidden="true" aria-label="دستیار هوشمند">
+  <div class="drawer-head">
+    <strong>🤖 <span data-i18n="ai_assistant">دستیار هوشمند</span></strong>
+    <button class="x-btn" type="button" data-close-drawer="aiDrawer" aria-label="بستن">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="ai-log" id="aiLog"></div>
+    <div class="pill-row" id="aiPills"></div>
+  </div>
+  <div class="drawer-foot">
+    <form class="ai-row" id="aiForm">
+      <input id="aiInput" data-i18n-ph="assistant_ph" placeholder="مثلاً: هدفون زیر ۲ میلیون با تحویل سریع" autocomplete="off">
+      <button class="btn" type="submit" data-i18n="send">ارسال</button>
+    </form>
+    <p class="hint" style="margin:6px 0 0">AI · <span id="aiEngine">local</span></p>
+  </div>
+</aside>
+
+<div class="toasts"></div>
+
+<script type="module" src="/js/storefront.js"></script>
+</body>
+</html>
