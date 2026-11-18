@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>پنل فروشنده | بازار هوشمند</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏪</text></svg>">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-row">
+    <a class="brand" href="/"><span class="logo">🏪</span><span class="name" data-i18n="seller_panel">پنل فروشنده</span></a>
+    <div class="header-actions">
+      <select id="langSelect" class="lang-select" aria-label="زبان">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+      <a class="icon-btn" href="/" data-i18n="open_store">ورود به فروشگاه</a>
+      <button class="icon-btn" id="logoutBtn" type="button" data-i18n="logout">خروج</button>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding:16px 0 40px">
+  <div id="gate" class="panel" hidden style="text-align:center">
+    <h2 id="gateTitle">دسترسی به پنل فروشنده</h2>
+    <p class="hint" id="gateText">برای مدیریت محصولات و سفارش‌ها وارد شوید.</p>
+    <div style="max-width:360px;margin:12px auto 0">
+      <div class="field"><label for="gEmail" data-i18n="email">ایمیل</label><input id="gEmail" type="email" autocomplete="email"></div>
+      <div class="field"><label for="gPass" data-i18n="password">رمز عبور</label><input id="gPass" type="password" autocomplete="current-password"></div>
+      <button class="btn block" id="gLogin" type="button" data-i18n="login">ورود</button>
+      <p class="hint" style="margin-top:8px">sara@bazaar.ir / Seller@1234</p>
+    </div>
+  </div>
+
+  <div id="panel" hidden>
+    <div class="panel" style="display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div>
+        <h2 id="storeName" style="margin:0">فروشگاه</h2>
+        <p class="hint" id="storeMeta" style="margin:0"></p>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <a class="btn secondary small" href="/" data-i18n="open_store">ورود به فروشگاه</a>
+        <button class="btn small" id="newProductBtn" type="button">＋ <span data-i18n="new_product">کالای جدید</span></button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="dash" type="button" data-i18n="dashboard">داشبورد</button>
+      <button class="tab" data-tab="products" type="button" data-i18n="my_products">کالاهای من</button>
+      <button class="tab" data-tab="orders" type="button" data-i18n="my_sales">سفارش‌های فروشگاه</button>
+      <button class="tab" data-tab="ai" type="button" data-i18n="ai_tools">ابزارهای هوش مصنوعی</button>
+    </div>
+
+    <!-- داشبورد -->
+    <section id="tab-dash">
+      <div class="stats" id="stats"></div>
+      <div class="layout" style="grid-template-columns:1fr;padding:0">
+        <div class="panel">
+          <h3 data-i18n="insights">تحلیل هوشمند</h3>
+          <div id="insights"></div>
+        </div>
+        <div class="panel">
+          <h3 data-i18n="my_sales">سفارش‌های فروشگاه</h3>
+          <div id="recentOrders"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- محصولات -->
+    <section id="tab-products" hidden>
+      <div class="panel">
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th data-i18n="image">تصویر</th><th data-i18n="name">نام</th><th data-i18n="categories">دسته</th>
+            <th data-i18n="price">قیمت</th><th data-i18n="stock">موجودی</th><th data-i18n="status">وضعیت</th><th></th>
+          </tr></thead>
+          <tbody id="productRows"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- سفارش‌ها -->
+    <section id="tab-orders" hidden>
+      <div class="panel">
+        <div class="field" style="max-width:240px">
+          <label for="orderFilter" data-i18n="status">وضعیت</label>
+          <select id="orderFilter"><option value="" data-i18n="all_status">همه وضعیت‌ها</option></select>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th data-i18n="order_no">شماره سفارش</th><th data-i18n="full_name">مشتری</th><th data-i18n="items">اقلام</th>
+            <th data-i18n="total">مبلغ</th><th data-i18n="status">وضعیت</th><th data-i18n="next_status">تغییر وضعیت</th>
+          </tr></thead>
+          <tbody id="orderRows"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ابزارهای هوش مصنوعی -->
+    <section id="tab-ai" hidden>
+      <div class="layout" style="grid-template-columns:1fr;padding:0">
+        <div class="panel ai-box">
+          <h3>✍️ <span data-i18n="generate_desc">تولید توضیحات</span></h3>
+          <div class="field-row">
+            <div class="field"><label data-i18n="name">نام کالا</label><input id="dName"></div>
+            <div class="field"><label data-i18n="categories">دسته</label><select id="dCat"></select></div>
+          </div>
+          <div class="field"><label data-i18n="features">ویژگی‌ها (با کاما جدا کنید)</label><input id="dFeatures"></div>
+          <div class="field-row">
+            <div class="field"><label data-i18n="tone">لحن</label>
+              <select id="dTone">
+                <option value="friendly" data-i18n="friendly">صمیمی</option>
+                <option value="professional" data-i18n="professional">حرفه‌ای</option>
+                <option value="short" data-i18n="short">کوتاه</option>
+              </select>
+            </div>
+            <div class="field"><label>&nbsp;</label><button class="btn block" id="dRun" type="button" data-i18n="generate_desc">تولید</button></div>
+          </div>
+          <div id="dOut" class="hint" style="white-space:pre-line"></div>
+        </div>
+
+        <div class="panel ai-box">
+          <h3>💰 <span data-i18n="suggest_price">پیشنهاد قیمت</span></h3>
+          <div class="field-row">
+            <div class="field"><label data-i18n="name">نام کالا</label><input id="pName"></div>
+            <div class="field"><label data-i18n="categories">دسته</label><select id="pCat"></select></div>
+          </div>
+          <div class="field"><label>قیمت خرید (تومان)</label><input id="pCost" type="number" min="0" step="1000"></div>
+          <button class="btn" id="pRun" type="button" data-i18n="suggest_price">پیشنهاد بده</button>
+          <div id="pOut" style="margin-top:10px"></div>
+        </div>
+
+        <div class="panel ai-box">
+          <h3>🔑 <span data-i18n="seo_keywords">کلیدواژه‌های سئو</span></h3>
+          <div class="field"><label data-i18n="description">توضیحات</label><textarea id="kDesc"></textarea></div>
+          <button class="btn" id="kRun" type="button" data-i18n="seo_keywords">تولید کلیدواژه</button>
+          <div id="kOut" class="pill-row"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- مودال محصول -->
+<div class="overlay" id="productModal" aria-hidden="true">
+  <div class="modal wide" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="pModalTitle" data-i18n="new_product">کالای جدید</h2>
+      <button class="x-btn" type="button" data-close="productModal" aria-label="بستن">✕</button>
+    </div>
+    <form id="productForm">
+      <input type="hidden" id="fId">
+      <div class="field-row">
+        <div class="field"><label for="fName" data-i18n="name">نام</label><input id="fName" name="name" required maxlength="120"></div>
+        <div class="field"><label for="fCat" data-i18n="categories">دسته</label><select id="fCat" name="category" required></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="fPrice" data-i18n="price">قیمت (تومان)</label><input id="fPrice" name="price" type="number" min="1000" step="1000" required></div>
+        <div class="field"><label for="fStock" data-i18n="stock">موجودی</label><input id="fStock" name="stock" type="number" min="0" step="1" required></div>
+      </div>
+      <div class="field"><label for="fDesc" data-i18n="description">توضیحات</label><textarea id="fDesc" name="description" required minlength="10" maxlength="4000"></textarea></div>
+      <div class="field"><label for="fTags" data-i18n="tags">برچسب‌ها</label><input id="fTags" name="tags" placeholder="هدفون، بی‌سیم، ورزشی"></div>
+
+      <div class="field-row">
+        <div class="field"><label>English name</label><input id="fEn" name="i18n_en" maxlength="120" dir="ltr"></div>
+        <div class="field"><label>الاسم بالعربية</label><input id="fAr" name="i18n_ar" maxlength="120" dir="rtl"></div>
+      </div>
+      <div class="field"><label>Türkçe ad</label><input id="fTr" name="i18n_tr" maxlength="120" dir="ltr"></div>
+
+      <div class="field">
+        <label data-i18n="image">تصویر</label>
+        <input id="fImageUrl" name="image" placeholder="/img/... یا https://..." dir="ltr">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+          <input id="fFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+          <span class="hint" data-i18n="upload_image">بارگذاری تصویر</span>
+        </div>
+        <div id="fPreview" style="margin-top:8px"></div>
+      </div>
+
+      <label class="check" style="margin-bottom:10px"><input id="fActive" name="active" type="checkbox" checked><span data-i18n="active_product">نمایش در فروشگاه</span></label>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn block" type="submit" data-i18n="save">ذخیره</button>
+        <button class="btn secondary block" type="button" data-close="productModal" data-i18n="cancel">انصراف</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toasts"></div>
+<script type="module" src="/js/seller.js"></script>
+</body>
+</html>
