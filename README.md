@@ -1,211 +1,111 @@
-<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>بازار هوشمند</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;font-family:Tahoma,Arial;background:#f4f6f8;color:#222}
-header{background:#087f5b;color:white;padding:22px 15px;text-align:center}
-header h1{margin:0 0 10px}
-header p{margin:0}
-.search{padding:18px;text-align:center}
-input{width:90%;max-width:500px;padding:13px;border:1px solid #ccc;border-radius:10px;font-size:16px}
-h2{text-align:center;color:#087f5b}
-.categories{display:flex;justify-content:center;flex-<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>بازار هوشمند</title>
-<style>
-body{font-family:Tahoma,Arial;background:#f4f6f9;margin:0;color:#222}
-header{background:#174ea6;color:white;padding:22px;text-align:center}
-nav{padding:15px;text-align:center;background:white}
-input,select{padding:12px;margin:5px;border:1px solid #ccc;border-radius:8px}
-main{padding:18px;max-width:1100px;margin:auto}
-.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:15px}
-.card{background:white;border-radius:12px;padding:14px;box-shadow:0 2px 8px #ddd}
-.card img{width:100%;height:160px;object-fit:contain}
-.price{color:#16834a;font-weight:bold}
-button{background:#174ea6;color:white;border:0;padding:12px 18px;border-radius:8px}
-a{color:white}
-</style>
-</head>
-<body>
+# بازار هوشمند — فروشگاه اینترنتی چندفروشندگی
 
-<header>
-<h1>بازار هوشمند</h1>
-<p>بازار آنلاین چندفروشندگی</p>
-<a href="Seller.html">ورود به پنل فروشندگان</a>
-</header>
+فروشگاه چندفروشندگی فارسی و موبایل‌محور با پنل فروشنده، پنل مدیریت، سبد خرید، سفارش‌ها، جست‌وجوی هوشمند، چهار زبان و ابزارهای هوش مصنوعی.
 
-<nav>
-<input id="search" placeholder="جست‌وجوی محصول">
-<select id="category">
-<option value="">همه دسته‌ها</option>
-<option>موبایل</option>
-<option>لوازم خانگی</option>
-<option>پوشاک</option>
-<option>دیجیتال</option>
-<option>سایر</option>
-</select>
-<button onclick="showProducts()">جست‌وجو</button>
-</nav>
+> این نسخه بازنویسی کامل پروژهٔ قبلی است. فایل‌های استاتیک قدیمی (`index.html` و `Seller.html` در ریشهٔ مخزن) که داده‌ها را فقط در `localStorage` نگه می‌داشتند و مارک‌آپ تکراری/خراب داشتند، جای خود را به یک برنامهٔ کامل سرورمحور داده‌اند. تغییرات روی شاخهٔ `appjet` قرار دارد و هیچ ادغامی با شاخهٔ دیگری انجام نشده است.
 
-<main>
-<h2>محصولات فروشگاه</h2>
-<div id="products" class="products"></div>
-<p id="empty"></p>
-</main>
+## امکانات
 
-<script>
-const STORAGE_KEY = "smartBazaarProducts";
+**فروشنده**
+- ثبت‌نام و ورود اختصاصی فروشنده، نام فروشگاه یکتا
+- داشبورد با آمار کالا، موجودی، سفارش‌های در انتظار و درآمد
+- تحلیل هوشمند فروش: پرفروش‌ترین کالاها، هشدار موجودی کم، کالاهای بدون تصویر و توضیح کوتاه
+- مدیریت کامل کالا (افزودن، ویرایش، حذف، فعال/غیرفعال)
+- بارگذاری تصویر کالا (PNG/JPEG/WebP/GIF تا ۳ مگابایت) یا ثبت نشانی تصویر
+- نام کالا به چهار زبان (فارسی، انگلیسی، عربی، ترکی)
+- مدیریت سفارش‌ها و تغییر مرحله‌ای وضعیت (در انتظار → تأیید → ارسال → تحویل)
 
-function getProducts(){
- try{
-  return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
- }catch(e){
-  return [];
- }
-}
+**مشتری**
+- جست‌وجوی متنی با پیشنهاد زنده، فیلتر دسته‌بندی، فروشنده، بازهٔ قیمت و موجودی
+- مرتب‌سازی (تازه‌ترین، ارزان‌ترین، گران‌ترین، محبوب‌ترین، امتیاز)
+- صفحهٔ کالا با تصویر، امتیاز، نظرات و کالاهای مشابه
+- سبد خرید پایدار در مرورگر، محاسبهٔ هزینهٔ ارسال و ارسال رایگان بالای سقف تعیین‌شده
+- ثبت سفارش با اطلاعات گیرنده، مشاهدهٔ سفارش‌های خود و ثبت نظر
+- دستیار خرید هوشمند
 
-function showProducts(){
- const list = getProducts();
- const search = document.getElementById("search").value.trim().toLowerCase();
- const category = document.getElementById("category").value;
- const box = document.getElementById("products");
- const empty = document.getElementById("empty");
+**مدیر**
+- آمار کلی کاربران، فروشندگان، کالاها، سفارش‌ها، نظرات و درآمد
+- نمودار وضعیت سفارش‌ها، پرفروش‌ترین کالاها و سفارش‌های اخیر
+- مدیریت کاربران (مسدودسازی/رفع مسدودی) و مشاهدهٔ همهٔ سفارش‌ها
 
- box.innerHTML = "";
+**هوش مصنوعی**
+- تولید توضیحات محصول با سه لحن (صمیمی، حرفه‌ای، کوتاه) در چهار زبان
+- پیشنهاد قیمت بر پایهٔ کالاهای مشابه و بهای تمام‌شده
+- تولید کلیدواژه‌های سئو
+- جست‌وجوی معنایی و دستیار خرید (تشخیص دسته‌بندی از متن پرسش)
 
- const filtered = list.filter(p =>
-  (!search || (p.name || "").toLowerCase().includes(search) ||
-   (p.description || "").toLowerCase().includes(search)) &&
-  (!category || p.category === category)
- );
+بدون کلید API، همهٔ ابزارهای هوشمند به‌صورت محلی و قطعی کار می‌کنند. با تنظیم `AI_API_KEY` (و اختیاری `AI_BASE_URL`، `AI_MODEL`) درخواست‌ها به یک مدل زبانی سازگار با OpenAI فرستاده می‌شود و در صورت خطا به موتور محلی بازمی‌گردد.
 
- if(filtered.length === 0){
-  empty.textContent = "هنوز محصولی ثبت نشده است.";
-  return;
- }
+## چهار زبان
 
- empty.textContent = "";
+رابط کاربری و داده‌های نمایشی به فارسی، انگلیسی، عربی و ترکی در دسترس‌اند. فارسی و عربی راست‌به‌چپ (`dir="rtl"`) نمایش داده می‌شوند و انتخاب زبان در `localStorage` نگه داشته می‌شود. اعداد و قیمت‌ها با قالب محلی هر زبان نمایش داده می‌شوند.
 
- filtered.forEach(p=>{
-  const card = document.createElement("div");
-  card.className = "card";
+## پشتهٔ فناوری
 
-  const img = document.createElement("img");
-  img.src = p.image || "";
-  img.alt = p.name || "محصول";
-  img.onerror = ()=>{img.style.display="none";};
+- Node.js 26 (Alpine) و Express 5
+- ذخیره‌سازی JSON روی دیسک (`data/db.json`) با نوشتن اتمی — بدون وابستگی نیتیو
+- احراز هویت با هش `scrypt` و کوکی امضاشدهٔ `HttpOnly`
+- فرانت‌اند بدون فریم‌ورک: HTML + CSS + ماژول‌های ES، طراحی موبایل‌اول
 
-  const title = document.createElement("h3");
-  title.textContent = p.name || "بدون نام";
+## اجرا
 
-  const desc = document.createElement("p");
-  desc.textContent = p.description || "";
+```bash
+npm install
+npm start          # http://localhost:3000
+npm test           # تست‌های API
+```
 
-  const price = document.createElement("p");
-  price.className = "price";
-  price.textContent = Number(p.price || 0).toLocaleString("fa-IR") + " تومان";
+متغیرهای محیطی:
 
-  const stock = document.createElement("p");
-  stock.textContent = "موجودی: " + (p.stock ?? 0);
+| متغیر | پیش‌فرض | توضیح |
+|---|---|---|
+| `PORT` | `3000` | پورت سرور |
+| `DATA_DIR` | `./data` | محل فایل پایگاه‌داده |
+| `SESSION_SECRET` | تولید خودکار در `data/.session-secret` | کلید امضای کوکی |
+| `AI_API_KEY` | — | کلید ارائه‌دهندهٔ مدل زبانی (اختیاری) |
+| `AI_BASE_URL` | `https://api.openai.com/v1` | نشانی سازگار با OpenAI |
+| `AI_MODEL` | `gpt-4o-mini` | نام مدل |
 
-  card.append(img,title,desc,price,stock);
-  box.appendChild(card);
- });
-}
+## حساب‌های نمایشی
 
-showProducts();
+| نقش | ایمیل | رمز |
+|---|---|---|
+| فروشنده | `sara@bazaar.ir` | `Seller@1234` |
+| فروشنده | `reza@bazaar.ir` | `Seller@1234` |
+| مدیر | `admin@bazaar.ir` | `Admin@1234` |
+| مشتری | `mina@example.com` | `Customer@1234` |
 
-window.addEventListener("storage",showProducts);
-</script>
+## ساختار
 
-</body>
-</html>:wrap;gap:10px;padding:10px}
-.categories button{border:0;background:#d8f3e8;color:#087f5b;padding:12px 18px;border-radius:20px;font-size:15px}
-.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:14px;padding:15px}
-.card{background:white;border-radius:12px;padding:15px;text-align:center;box-shadow:0 2px 8px #0001}
-.pic{font-size:55px;padding:15px}
-.card h3{font-size:16px}
-.price{color:#087f5b;font-weight:bold}
-.card button{background:#087f5b;color:white;border:0;border-radius:8px;padding:10px;width:100%}
-footer{background:#173b32;color:white;text-align:center;padding:22px;margin-top:25px}
-</style>
-</head>
-<body>
+```
+server.js              مسیرهای API، احراز هویت، سرو فایل‌های استاتیک
+src/catalog.js         دسته‌بندی‌ها، زبان‌ها، چرخهٔ وضعیت سفارش
+src/store.js           لایهٔ ذخیره‌سازی JSON
+src/auth.js            هش رمز، کوکی امضاشده، نقش‌ها
+src/ai.js              موتور هوشمند محلی و اتصال اختیاری به ارائه‌دهنده
+src/seed.js            دادهٔ اولیهٔ نمایشی و تصاویر SVG
+public/index.html      فروشگاه مشتری
+public/seller.html     پنل فروشنده
+public/admin.html      پنل مدیریت
+public/js/core.js      چهار زبان، RTL، کلاینت API، سبد خرید، اعلان‌ها
+public/js/*.js         منطق هر صفحه
+tests/                 تست‌های API با node:test
+Dockerfile             ایمیج تولیدی Alpine
+```
 
-<header>
-<h1>🛍️ بازار هوشمند</h1>
-<p>بازار آنلاین خرید و فروش</p>
-</header>
+## امنیت
 
-<div class="search">
-<input id="search" type="search" placeholder="نام محصول را جست‌وجو کنید...">
-</div>
+- رمزها با `scrypt` و نمک تصادفی ذخیره می‌شوند؛ خروجی API هرگز هش رمز یا اطلاعات تماس فروشنده را برنمی‌گرداند.
+- کوکی نشست `HttpOnly`، `SameSite=Lax` و در محیط تولید `Secure` است.
+- دسترسی‌ها با نقش بررسی می‌شوند؛ فروشنده فقط کالا و سفارش‌های خودش را می‌بیند و مدیر قابل مسدودسازی نیست.
+- ورودی‌ها اعتبارسنجی و طول‌محدود می‌شوند؛ بارگذاری تصویر فقط از نوع تصویر و تا ۳ مگابایت پذیرفته می‌شود.
+- مسیرهای ورود و هوش مصنوعی محدودیت نرخ درخواست دارند و فایل‌های پایگاه‌داده و نشست از دسترس عمومی خارج‌اند.
 
-<h2>دسته‌بندی کالاها</h2>
-<div class="categories">
-<button onclick="filter('همه')">همه کالاها</button>
-<button onclick="filter('موبایل')">موبایل</button>
-<button onclick="filter('پوشاک')">پوشاک</button>
-<button onclick="filter('خانه')">خانه</button>
-</div>
+## استقرار
 
-<h2>محصولات فروشگاه</h2>
-<div class="products" id="products">
+```bash
+docker build -t smart-bazaar .
+docker run -p 3000:3000 -v smart-bazaar-data:/app/data smart-bazaar
+```
 
-<div class="card" data-category="موبایل">
-<div class="pic">📱</div>
-<h3>گوشی هوشمند</h3>
-<p class="price">قیمت: نمونه</p>
-<button onclick="alert('برای خرید، به‌زودی امکان ثبت سفارش اضافه می‌شود.')">مشاهده محصول</button>
-</div>
-
-<div class="card" data-category="پوشاک">
-<div class="pic">👕</div>
-<h3>لباس مردانه</h3>
-<p class="price">قیمت: نمونه</p>
-<button onclick="alert('برای خرید، به‌زودی امکان ثبت سفارش اضافه می‌شود.')">مشاهده محصول</button>
-</div>
-
-<div class="card" data-category="خانه">
-<div class="pic">🏠</div>
-<h3>وسایل خانه</h3>
-<p class="price">قیمت: نمونه</p>
-<button onclick="alert('برای خرید، به‌زودی امکان ثبت سفارش اضافه می‌شود.')">مشاهده محصول</button>
-</div>
-
-</div>
-
-<footer>
-<p>بازار هوشمند | خرید آسان، فروش هوشمند</p>
-<p>فارسی | English | العربية</p>
-</footer>
-
-<script>
-const cards = document.querySelectorAll('.card');
-
-function filter(category){
-cards.forEach(card=>{
-card.style.display =
-category === 'همه' || card.dataset.category === category
-? 'block' : 'none';
-});
-}
-
-document.getElementById('search').addEventListener('input',function(){
-const value=this.value.trim().toLowerCase();
-cards.forEach(card=>{
-card.style.display=card.innerText.toLowerCase().includes(value)
-? 'block' : 'none';
-});
-});
-</script>
-
-</body>
-</html>
+برای ماندگاری داده‌ها در محیط تولید، `DATA_DIR` را به یک دیسک پایدار اشاره دهید یا از دیسک ماندگار سرویس میزبانی استفاده کنید.
