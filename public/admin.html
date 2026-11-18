@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مدیریت بازار هوشمند</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-row">
+    <a class="brand" href="/"><span class="logo">🛡️</span><span class="name" data-i18n="admin_panel">پنل مدیریت</span></a>
+    <div class="header-actions">
+      <select id="langSelect" class="lang-select" aria-label="زبان">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+      <a class="icon-btn" href="/" data-i18n="open_store">فروشگاه</a>
+      <button class="icon-btn" id="logoutBtn" type="button" data-i18n="logout">خروج</button>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding:16px 0 40px">
+  <div id="gate" class="panel" hidden style="text-align:center">
+    <h2 data-i18n="admin_panel">پنل مدیریت</h2>
+    <p class="hint">دسترسی فقط برای حساب مدیر.</p>
+    <div style="max-width:360px;margin:12px auto 0">
+      <div class="field"><label for="gEmail" data-i18n="email">ایمیل</label><input id="gEmail" type="email" autocomplete="email"></div>
+      <div class="field"><label for="gPass" data-i18n="password">رمز عبور</label><input id="gPass" type="password" autocomplete="current-password"></div>
+      <button class="btn block" id="gLogin" type="button" data-i18n="login">ورود</button>
+      <p class="hint" style="margin-top:8px">admin@bazaar.ir / Admin@1234</p>
+    </div>
+  </div>
+
+  <div id="panel" hidden>
+    <div class="tabs">
+      <button class="tab active" data-tab="overview" type="button" data-i18n="dashboard">داشبورد</button>
+      <button class="tab" data-tab="users" type="button" data-i18n="users">کاربران</button>
+      <button class="tab" data-tab="orders" type="button" data-i18n="orders">سفارش‌ها</button>
+    </div>
+
+    <section id="tab-overview">
+      <div class="stats" id="stats"></div>
+      <div class="layout" style="grid-template-columns:1fr;padding:0">
+        <div class="panel">
+          <h3 data-i18n="status_breakdown">وضعیت سفارش‌ها</h3>
+          <div id="statusBreakdown" class="pill-row"></div>
+        </div>
+        <div class="panel">
+          <h3 data-i18n="top_products">پرفروش‌ترین کالاها</h3>
+          <div id="topProducts"></div>
+        </div>
+        <div class="panel">
+          <h3 data-i18n="recent_orders">سفارش‌های اخیر</h3>
+          <div id="recentOrders"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-users" hidden>
+      <div class="panel">
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th data-i18n="name">نام</th><th data-i18n="email">ایمیل</th><th data-i18n="role">نقش</th>
+            <th data-i18n="store">فروشگاه</th><th data-i18n="status">وضعیت</th><th></th>
+          </tr></thead>
+          <tbody id="userRows"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <section id="tab-orders" hidden>
+      <div class="panel">
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th data-i18n="order_no">شماره</th><th data-i18n="store">فروشگاه</th><th data-i18n="customer">مشتری</th>
+            <th data-i18n="total">مبلغ</th><th data-i18n="status">وضعیت</th><th data-i18n="date">تاریخ</th>
+          </tr></thead>
+          <tbody id="orderRows"></tbody>
+        </table></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div class="toasts"></div>
+<script type="module" src="/js/admin.js"></script>
+</body>
+</html>
