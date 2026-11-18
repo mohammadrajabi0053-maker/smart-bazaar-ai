@@ -17,7 +17,7 @@ seedIfEmpty();
 
 const app = createApp();
 const server = await new Promise((resolve) => {
-  const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
+  const instance = app.listen(0, '0.0.0.0', () => resolve(instance));
 });
 const base = `http://127.0.0.1:${server.address().port}`;
 
