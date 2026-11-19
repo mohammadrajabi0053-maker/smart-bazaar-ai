@@ -10,8 +10,61 @@ export const SENSITIVE_ACTIONS = [
   'passkey_removed', 'environment_changed', 'alert_config_updated',
 ];
 
-const SEVERITIES = ['info', 'warning', 'critical'];
-const MAX_ALERTS = 200;
+export const SEVERITIES = ['info', 'medium', 'high', 'critical'];
+export const MAX_ALERTS = 200;
+export const MAX_EVENTS = 1000;
+export const EVENT_RETENTION_DAYS = 90;
+
+/** نگاشت شدت‌ها؛ رویدادهای قدیمی با warning به سطح «متوسط» تبدیل می‌شوند */
+export function normalizeSeverity(value) {
+  const raw = String(value || '').toLowerCase();
+  if (raw === 'warning') return 'medium';
+  if (raw === 'error' || raw === 'severe') return 'high';
+  return SEVERITIES.includes(raw) ? raw : 'info';
+}
+
+/** محدودیت حجم و مدت نگهداری رویدادهای امنیتی */
+export function trimSecurityEvents(db) {
+  if (!Array.isArray(db.securityEvents)) return 0;
+  const cutoff = Date.now() - EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const kept = db.securityEvents.filter((event) => {
+    const at = Date.parse(event.at);
+    return !Number.isFinite(at) || at >= cutoff;
+  });
+  const overflow = kept.length > MAX_EVENTS ? kept.length - MAX_EVENTS : 0;
+  const result = overflow ? kept.slice(overflow) : kept;
+  const removed = db.securityEvents.length - result.length;
+  if (removed > 0) {
+    db.securityEvents = result;
+    saveDbSoon();
+  }
+  return removed;
+}
+
+/** علامت‌گذاری رویداد به‌عنوان بررسی‌شده (فقط زمان و شناسهٔ بررسی‌کننده ثبت می‌شود) */
+export function ackSecurityEvent(db, eventId, actorId) {
+  const events = Array.isArray(db.securityEvents) ? db.securityEvents : [];
+  const row = events.find((event) => event.id === eventId);
+  if (!row) return null;
+  if (!row.ackAt) {
+    row.ackAt = new Date().toISOString();
+    row.ackBy = String(actorId || '').slice(0, 60);
+    saveDbSoon();
+  }
+  return row;
+}
+
+export function ackAlert(db, alertId, actorId) {
+  const rows = Array.isArray(db.alerts) ? db.alerts : [];
+  const row = rows.find((item) => item.id === alertId);
+  if (!row) return null;
+  if (!row.ackAt) {
+    row.ackAt = new Date().toISOString();
+    row.ackBy = String(actorId || '').slice(0, 60);
+    saveDbSoon();
+  }
+  return row;
+}
 
 function dayKey(value) {
   return String(value || '').slice(0, 10);
@@ -27,15 +80,16 @@ export function monitorOverview(db, q = {}) {
       return Number.isFinite(at) ? at >= from && at <= to : false;
     })
     .filter((event) => !q.type || event.type === q.type)
-    .filter((event) => !q.severity || event.severity === q.severity)
+    .filter((event) => !q.severity || normalizeSeverity(event.severity) === normalizeSeverity(q.severity))
     .filter((event) => !search || `${event.type} ${event.identity} ${event.ip} ${event.detail} ${event.path}`.toLowerCase().includes(search));
 
   const byType = {};
-  const bySeverity = { info: 0, warning: 0, critical: 0 };
+  const bySeverity = { info: 0, medium: 0, high: 0, critical: 0 };
   const byDay = {};
   for (const event of events) {
     byType[event.type] = (byType[event.type] || 0) + 1;
-    if (bySeverity[event.severity] !== undefined) bySeverity[event.severity] += 1;
+    const level = normalizeSeverity(event.severity);
+    bySeverity[level] += 1;
     const day = dayKey(event.at);
     byDay[day] = (byDay[day] || 0) + 1;
   }
@@ -73,7 +127,12 @@ export function monitorOverview(db, q = {}) {
     byDay: Object.entries(byDay).sort((a, b) => a[0].localeCompare(b[0])).map(([day, count]) => ({ day, count })),
     suspicious,
     sensitive: auditRows,
-    events: events.slice(-100).reverse(),
+    events: events.slice(-100).reverse().map((event) => ({
+      ...event,
+      severity: normalizeSeverity(event.severity),
+      ackAt: event.ackAt || null,
+    })),
+    unacknowledged: events.filter((event) => !event.ackAt).length,
     posture: {
       twoFactorUsers,
       passkeys,
@@ -97,7 +156,7 @@ export function alertConfig(db) {
   return {
     enabled: Boolean(cfg.enabled),
     webhookUrl: cfg.webhookUrl || '',
-    minSeverity: SEVERITIES.includes(cfg.minSeverity) ? cfg.minSeverity : 'warning',
+    minSeverity: SEVERITIES.includes(cfg.minSeverity) ? cfg.minSeverity : 'medium',
     updatedAt: cfg.updatedAt || null,
   };
 }
@@ -113,7 +172,7 @@ export function setAlertConfig(db, patch = {}) {
     throw err;
   }
   webhookUrl = webhookUrl.slice(0, 300);
-  const minSeverity = SEVERITIES.includes(patch.minSeverity) ? patch.minSeverity : current.minSeverity;
+  const minSeverity = patch.minSeverity === undefined ? current.minSeverity : normalizeSeverity(patch.minSeverity);
   db.settings.alerts = {
     enabled: patch.enabled === undefined ? current.enabled : Boolean(patch.enabled),
     webhookUrl,
@@ -131,7 +190,7 @@ export async function dispatchAlert(db, { type = 'security', severity = 'warning
     id: id(),
     at: new Date().toISOString(),
     type: String(type).slice(0, 60),
-    severity: SEVERITIES.includes(severity) ? severity : 'warning',
+    severity: normalizeSeverity(severity),
     title: String(title).slice(0, 140),
     detail: String(detail).slice(0, 300),
     channel: 'none',
