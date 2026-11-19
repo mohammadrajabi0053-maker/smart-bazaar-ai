@@ -348,11 +348,15 @@ test('Passkey: ثبت کلید و ورود کامل با امضای EC2', async 
     method: 'POST',
     body: {
       challenge,
-      label: 'کلید آزمایشی',
-      credentialData姫 به شمارهگذ姉이 secret,
-     姫く SignupData姤 شدید credentialType姫び کلAuthType姫으nba credential姉证keyData,
-姹补 کلAuthData姹派 کلید credential姉用کلAuthKey姫物 احintake姹帕 — client.姫障 کAuth:姫/کkey,
-姤实地 منتظر-test姉พาะAuthenticast姉书3; verify姉2026.enc姫rams+certs.yaml姒噪比EEE =姤眼23-Za姫se 0,
+      label: 'کلید امنیتی',
+      credential: {
+        id: b64u(authenticator.credentialId),
+        transports: ['internal'],
+        response: {
+          clientDataJSON: clientData('webauthn.create', challenge),
+          attestationObject: b64u(attestationObject),
+        },
+      },
     },
   });
   assert.equal(registered.status, 201, `ثبت کلید باید موفق باشد: ${registered.text}`);
