@@ -3030,6 +3030,13 @@ export function createApp() {
     return next();
   });
 
+  // گارد مرکز امنیت: فقط مدیر اصلی (پیش از سرو فایل استاتیک تا صفحه لو نرود)
+  app.use(['/security', '/security.html', '/js/security.js'], (req, res, next) => {
+    if (!req.user) return res.redirect('/?next=/security');
+    if (!isOwner(getDb(), req.user)) return res.status(403).type('html').send(deniedHtml);
+    return next();
+  });
+
   // گارد پنل مدیریتی اصناف: دسترسی فقط برای مدیر و کارشناس مجاز
   app.use(['/business', '/business.html', '/js/business.js', '/css/business.css'], (req, res, next) => {
     if (!req.user) return res.redirect('/login?next=/business');

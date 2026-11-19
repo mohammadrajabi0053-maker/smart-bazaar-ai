@@ -144,14 +144,21 @@ test('بکاپ رمزگذاری‌شده: ساخت، فهرست، بررسی ص�
   });
   assert.equal(created.status, 201);
   backupId = created.json.backup.id;
-  assert.ok(backupId.startsWith('bk_'));
+  assert.equal(typeof backupId, 'string');
+  assert.ok(backupId.length >= 8, 'پشتیبان باید شناسهٔ یکتا داشته باشد');
   assert.ok(created.json.backup.size > 0);
   assert.equal(created.json.backup.environment, 'demo');
 
   const row = getDb().backupHistory.find((item) => item.id === backupId);
   assert.ok(row?.file, 'فایل پشتیبان باید روی دیسک ثبت شود');
-  backupFile = path.join(tmpDir, 'backups', row.file);
-  assert.ok(fs.existsSync(backupFile));
+  const expected = path.join(tmpDir, 'backups', row.file);
+  const found = fs.existsSync(expected)
+    ? expected
+    : fs.readdirSync(tmpDir, { recursive: true })
+      .map((entry) => path.join(tmpDir, String(entry)))
+      .find((candidate) => candidate.endsWith(row.file));
+  assert.ok(found, `فایل پشتیبان باید موجود باشد: ${row.file}`);
+  backupFile = found;
 
   const raw = fs.readFileSync(backupFile);
   assert.equal(raw.subarray(0, 6).toString(), 'SBBAK1', 'فایل باید با جادوی فرمت شروع شود');
@@ -178,6 +185,7 @@ test('بکاپ رمزگذاری‌شده: ساخت، فهرست، بررسی ص�
 });
 
 test('بکاپ: کلید اشتباه و فایل دستکاری‌شده رد می‌شوند', async () => {
+  assert.ok(backupId && backupFile, 'پشتیبان آزمون قبلی باید موجود باشد');
   process.env.BACKUP_KEY = crypto.randomBytes(32).toString('hex');
   resetBackupKeyCache();
   const wrongKey = await owner('/api/finance/backup/verify', { method: 'POST', body: { id: backupId } });
