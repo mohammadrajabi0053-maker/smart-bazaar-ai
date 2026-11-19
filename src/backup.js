@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { DATA_DIR, UPLOAD_DIR, getDb, id, saveDbSoon } from './store.js';
-import { audit, verifyChain } from './finance.js';
+import { audit, chainKey, installChainKey, verifyChain } from './finance.js';
 
 export const BACKUP_FORMAT = 'sb-backup-v1';
 export const BACKUP_MAGIC = 'SBBAK1';
@@ -85,38 +85,142 @@ export function collectionCounts(db) {
   return counts;
 }
 
-function uploadManifest() {
+const UPLOAD_LIMITS = { maxFiles: 500, maxFileBytes: 2 * 1024 * 1024, maxTotalBytes: 20 * 1024 * 1024 };
+const UPLOAD_NAME = /^[\w.-]{1,80}$/;
+
+export function uploadLimits() {
+  return { ...UPLOAD_LIMITS };
+}
+
+/** جمع‌آوری بایت‌های تصاویر برای پشتیبان (با سقف حجم تا بستهٔ پشتیبان از حد مجاز نگذرد) */
+function collectUploads() {
+  const files = [];
+  let totalBytes = 0;
+  let truncated = false;
+  let skipped = 0;
+  let names = [];
   try {
-    const names = fs.readdirSync(UPLOAD_DIR).filter((name) => !name.startsWith('.')).slice(0, 500);
-    return names.map((name) => {
-      const file = path.join(UPLOAD_DIR, name);
-      const data = fs.readFileSync(file);
-      return {
-        name,
-        bytes: data.length,
-        sha256: crypto.createHash('sha256').update(data).digest('hex'),
-      };
-    });
+    names = fs.readdirSync(UPLOAD_DIR).filter((name) => !name.startsWith('.')).sort();
   } catch {
-    return [];
+    return { files, totalBytes, truncated, skipped, limits: uploadLimits() };
   }
+  for (const name of names) {
+    if (!UPLOAD_NAME.test(name)) {
+      skipped += 1;
+      continue;
+    }
+    if (files.length >= UPLOAD_LIMITS.maxFiles) {
+      truncated = true;
+      break;
+    }
+    let data;
+    try {
+      const stat = fs.statSync(path.join(UPLOAD_DIR, name));
+      if (!stat.isFile() || stat.size > UPLOAD_LIMITS.maxFileBytes) {
+        skipped += 1;
+        continue;
+      }
+      if (totalBytes + stat.size > UPLOAD_LIMITS.maxTotalBytes) {
+        truncated = true;
+        continue;
+      }
+      data = fs.readFileSync(path.join(UPLOAD_DIR, name));
+    } catch {
+      skipped += 1;
+      continue;
+    }
+    totalBytes += data.length;
+    files.push({
+      name,
+      bytes: data.length,
+      sha256: crypto.createHash('sha256').update(data).digest('hex'),
+      data: data.toString('base64'),
+    });
+  }
+  return { files, totalBytes, truncated, skipped, limits: uploadLimits() };
+}
+
+/** اعتبارسنجی فهرست تصاویر داخل پشتیبان (هش هر فایل بررسی می‌شود) */
+function validateUploads(list) {
+  if (list === undefined || list === null) return [];
+  if (!Array.isArray(list) || list.length > UPLOAD_LIMITS.maxFiles) throw new BackupError('backup_corrupt');
+  const out = [];
+  for (const item of list) {
+    const name = String(item?.name || '');
+    if (!UPLOAD_NAME.test(name)) throw new BackupError('backup_corrupt');
+    if (item?.data === undefined) {
+      out.push({ name, bytes: Number(item?.bytes) || 0, sha256: String(item?.sha256 || ''), buffer: null });
+      continue;
+    }
+    const buffer = Buffer.from(String(item.data || ''), 'base64');
+    if (buffer.length !== Number(item?.bytes || -1)) throw new BackupError('backup_corrupt');
+    if (crypto.createHash('sha256').update(buffer).digest('hex') !== String(item?.sha256 || '')) {
+      throw new BackupError('backup_corrupt');
+    }
+    out.push({ name, bytes: buffer.length, sha256: item.sha256, buffer });
+  }
+  return out;
+}
+
+/** نوشتن تصاویر بازیابی‌شده روی دیسک؛ فایل‌های یکسان دوباره نوشته نمی‌شوند */
+export function restoreUploads(files = []) {
+  const result = { written: 0, skipped: 0, bytes: 0 };
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true, mode: 0o755 });
+  for (const file of files) {
+    if (!file?.buffer) {
+      result.skipped += 1;
+      continue;
+    }
+    const target = path.join(UPLOAD_DIR, file.name);
+    try {
+      if (fs.existsSync(target)) {
+        const existing = fs.readFileSync(target);
+        if (crypto.createHash('sha256').update(existing).digest('hex') === file.sha256) {
+          result.skipped += 1;
+          continue;
+        }
+      }
+      fs.writeFileSync(target, file.buffer, { mode: 0o644 });
+      result.written += 1;
+      result.bytes += file.buffer.length;
+    } catch {
+      result.skipped += 1;
+    }
+  }
+  return result;
 }
 
 export function createBackup(db, { reason = 'manual', includeSecrets = false, now = new Date() } = {}) {
   const createdAt = now.toISOString();
   const chain = verifyChain(db);
+  const uploads = collectUploads();
   const payload = {
     format: BACKUP_FORMAT,
-    schema: 1,
+    schema: 2,
     createdAt,
     reason: String(reason).slice(0, 60),
     environment: db?.settings?.environment === 'live' ? 'live' : 'demo',
     counts: collectionCounts(db),
-    chain: { valid: chain.valid === true, entries: chain.entries || 0, head: chain.head || null },
-    uploads: uploadManifest(),
+    chain: {
+      valid: chain.valid === true,
+      entries: chain.entries || 0,
+      head: chain.head || null,
+      signed: chain.signed || 0,
+      legacy: chain.legacy || 0,
+      hmac: chain.hmac || 'unsigned',
+    },
+    uploads: uploads.files,
+    uploadsMeta: {
+      count: uploads.files.length,
+      totalBytes: uploads.totalBytes,
+      truncated: uploads.truncated,
+      skipped: uploads.skipped,
+      limits: uploads.limits,
+    },
     data: db,
   };
-  if (includeSecrets) payload.secrets = { sessionSecret: true };
+  // کلید زنجیره در بستهٔ رمزگذاری‌شده می‌رود تا پس از Redeploy قابل بازگردانی باشد
+  payload.secrets = { chainKeyHex: chainKey().toString('hex'), sessionSecret: includeSecrets === true };
   const plain = zlib.gzipSync(Buffer.from(JSON.stringify(payload), 'utf8'));
   const salt = crypto.randomBytes(16);
   const iv = crypto.randomBytes(12);
@@ -130,6 +234,7 @@ export function createBackup(db, { reason = 'manual', includeSecrets = false, no
     environment: payload.environment,
     counts: payload.counts,
     chain: payload.chain,
+    uploads: payload.uploadsMeta,
     fingerprint: backupFingerprint(),
     keyCheck: keyCheckToken(),
     includeSecrets,
@@ -216,7 +321,9 @@ export function verifyBackup(input) {
   for (const [key, value] of Object.entries(header.counts || {})) {
     if (counts[key] !== value) throw new BackupError('backup_mismatch');
   }
-  const chain = verifyChain(payload.data);
+  const chainKeyHex = kitChainKey(payload);
+  const chain = verifyChain(payload.data, { keyHex: chainKeyHex });
+  const uploads = validateUploads(payload.uploads);
   return {
     ok: true,
     header,
@@ -224,7 +331,13 @@ export function verifyBackup(input) {
     chain,
     createdAt: header.createdAt,
     environment: header.environment,
-    uploads: Array.isArray(payload.uploads) ? payload.uploads.length : 0,
+    uploads: uploads.length,
+    uploadsMeta: {
+      count: uploads.length,
+      totalBytes: uploads.reduce((sum, file) => sum + file.bytes, 0),
+      truncated: Boolean(payload.uploadsMeta?.truncated),
+      legacy: uploads.some((file) => !file.buffer),
+    },
   };
 }
 
@@ -234,8 +347,29 @@ export function readBackupForRestore(input) {
   for (const [key, value] of Object.entries(header.counts || {})) {
     if (counts[key] !== value) throw new BackupError('backup_mismatch');
   }
-  const chain = verifyChain(payload.data);
-  return { header, counts, chain, data: payload.data, environment: header.environment };
+  const chainKeyHex = kitChainKey(payload);
+  const chain = verifyChain(payload.data, { keyHex: chainKeyHex });
+  const uploads = validateUploads(payload.uploads);
+  return {
+    header,
+    counts,
+    chain,
+    data: payload.data,
+    environment: header.environment,
+    uploads,
+    chainKeyHex,
+    uploadsMeta: {
+      count: uploads.length,
+      totalBytes: uploads.reduce((sum, file) => sum + file.bytes, 0),
+      truncated: Boolean(payload.uploadsMeta?.truncated),
+    },
+  };
+}
+
+/** کلید زنجیرهٔ داخل بستهٔ پشتیبان (برای بررسی درست حتی با کلید محلی متفاوت) */
+function kitChainKey(payload) {
+  const hex = String(payload?.secrets?.chainKeyHex || '').trim();
+  return /^[0-9a-f]{64}$/i.test(hex) ? hex : null;
 }
 
 export function saveBackupFile(buffer, filename) {
