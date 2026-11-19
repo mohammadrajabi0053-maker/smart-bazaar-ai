@@ -2,9 +2,9 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=devic-width, initial-scale=1">
-<meta name="description" content="مرکز تبلیغات هوشمند — انتخاب کشور، ارز محل، رسانه، مدت و پیش‌فاکتور">
-<title>مرکز تبلیغات هوشمند | بازاز هوشمند</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="مرکز تبلیغات هوشمند — انتخاب کشور، ارز محلی، رسانه، مدت و پیش‌فاکتور">
+<title>مرکز تبلیغات هوشمند | بازار هوشمند</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📣</text></svg>">
 <link rel="stylesheet" href="/css/app.css">
 <link rel="stylesheet" href="/css/ads.css">
@@ -35,12 +35,12 @@
 <section class="ads-hero">
   <div class="container">
     <h1 data-ad="title">مرکز تبلیغات هوشمند</h1>
-    <p data-ad="sub">کمپین خود را بر اساس کشور، ارز محل، رسانه و مدت انتخاب کن و هزینه را هم به ارز محل و هم به دلار ببین.</p>
-    <div class="ads-bage">
-      <span class="ads-bage-item">🌍 <span data-ad="badge_countries">۹ کشور</span></span>
-      <span class="ads-bage-item">📣 <span data-ad="badge_media">۵ رسانه</span></span>
-      <span class="ads-bage-item">💱 <span data-ad="badge_currency">۱۰ ارز</span></span>
-      <span class="ads-bage-item">🧾 <span data-ad="badge_invoice">پیش‌فاکتور فوری</span></span>
+    <p data-ad="sub">کشور، ارز محلی، رسانه و مدت تبلیغ را انتخاب کنید و هزینه را هم به ارز محلی و هم به دلار ببینید.</p>
+    <div class="ads-badge">
+      <span class="ads-badge-item">🌍 <span data-ad="badge_countries">۹ کشور</span></span>
+      <span class="ads-badge-item">📣 <span data-ad="badge_media">۵ رسانه</span></span>
+      <span class="ads-badge-item">💱 <span data-ad="badge_currency">۱۰ ارز</span></span>
+      <span class="ads-badge-item">🧾 <span data-ad="badge_invoice">پیش‌فاکتور فوری</span></span>
     </div>
   </div>
 </section>
@@ -62,7 +62,7 @@
       </div>
 
       <div class="field">
-        <label for="currency" data-ad="currency">واحد پل</label>
+        <label for="currency" data-ad="currency">واحد پول</label>
         <select id="currency"></select>
         <p class="hint" id="currencyHint"></p>
       </div>
@@ -70,7 +70,7 @@
       <div class="field">
         <label data-ad="media">رسانه انتشار</label>
         <div class="ads-chips" id="mediaList"></div>
-        <p class="hint" data-ad="media_hint">حداکثر سه رسانه؛ هر رسانه خط جدای در پیش‌فاکتور دارد.</p>
+        <p class="hint" data-ad="media_hint">حداکثر سه رسانه؛ هر رسانه یک خط جدا در پیش‌فاکتور دارد.</p>
       </div>
 
       <div class="field-row">
@@ -90,7 +90,7 @@
           <select id="duration"></select>
         </div>
         <div class="field">
-          <label for="startDate" data-ad="start_date">تارخ شروع</label>
+          <label for="startDate" data-ad="start_date">تاریخ شروع</label>
           <input id="startDate" type="date">
         </div>
       </div>
@@ -102,7 +102,7 @@
 
       <div class="field">
         <label for="adDesc" data-ad="ad_desc">توضیحات (اختیاری)</label>
-        <textarea id="adDesc" maxlength="1000" rows="3" data-ad-ph="ad_desc_ph" placeholder="محصول، مخاطب، پیام کلدی"></textarea>
+        <textarea id="adDesc" maxlength="1000" rows="3" data-ad-ph="ad_desc_ph" placeholder="محصول، مخاطب، پیام کلیدی"></textarea>
       </div>
 
       <p class="hint" id="formHint"></p>
@@ -133,7 +133,7 @@
           <th data-ad="country">کشور</th>
           <th data-ad="duration">مدت</th>
           <th data-ad="total">مبلغ</th>
-          <th data-ad="status">وضیعت</th>
+          <th data-ad="status">وضعیت</th>
           <th></th>
         </tr></thead>
         <tbody id="campaignRows"></tbody>
@@ -166,9 +166,9 @@
       <button class="x-btn" type="button" data-close="loginModal" aria-label="بستن">✕</button>
     </div>
     <div class="ads-modal-body">
-      <p class="hint" data-ad="login_hint">برای ثبت سفارش تبلیغ، با حساب خود وارِد شوید.</p>
-      <div class="field"><label for="lgEmail" data-ad="email">ایمیل</label><input id="lgEmail" type="email" autocomplate="email"></div>
-      <div class="field"><label for="lgPass" data-ad="password">رمز عبور</label><input id="lgPass" type="password" autocomplate="current-password"></div>
+      <p class="hint" data-ad="login_hint">برای ثبت سفارش تبلیغ با حساب خود وارد شوید.</p>
+      <div class="field"><label for="lgEmail" data-ad="email">ایمیل</label><input id="lgEmail" type="email" autocomplete="email"></div>
+      <div class="field"><label for="lgPass" data-ad="password">رمز عبور</label><input id="lgPass" type="password" autocomplete="current-password"></div>
       <p class="hint" id="loginHint"></p>
     </div>
     <div class="ads-modal-foot">
