@@ -92,6 +92,20 @@ export function uploadLimits() {
   return { ...UPLOAD_LIMITS };
 }
 
+/** آمار زندهٔ تصاویر موجود برای نمایش در وضعیت پشتیبان */
+export function uploadStats() {
+  try {
+    const files = collectUploads();
+    return {
+      count: files.length,
+      bytes: files.reduce((sum, file) => sum + (file.bytes || 0), 0),
+      truncated: files.some((file) => !file.buffer),
+    };
+  } catch {
+    return { count: 0, bytes: 0, truncated: false };
+  }
+}
+
 /** جمع‌آوری بایت‌های تصاویر برای پشتیبان (با سقف حجم تا بستهٔ پشتیبان از حد مجاز نگذرد) */
 function collectUploads() {
   const files = [];

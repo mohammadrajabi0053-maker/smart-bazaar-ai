@@ -47,7 +47,7 @@ import {
 import {
   BackupError, backupFingerprint, backupKeySource, createBackup, createRecoveryKit, installKeys,
   readBackupFile, readBackupForRestore, readRecoveryKit, restoreUploads, runScheduledBackup,
-  saveBackupFile, startBackupScheduler, uploadLimits, verifyBackup,
+  saveBackupFile, startBackupScheduler, uploadLimits, uploadStats, verifyBackup,
 } from './src/backup.js';
 import { seedIfEmpty, ensureSeedImages } from './src/seed.js';
 import { seedDirectory } from './src/seed-directory.js';
@@ -1721,7 +1721,7 @@ export function createApp() {
       count: history.length,
       storage: 'data/backups',
       persistentDisk: false,
-      uploads: { ...uploadLimits(), storage: 'public/uploads', includedInBackup: true },
+      uploads: { ...uploadLimits(), ...uploadStats(), storage: 'public/uploads', includedInBackup: true },
       chain: {
         hmac: 'sha256',
         keySource: chainKeySource(),
