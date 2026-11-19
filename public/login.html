@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ورود و ثبت‌نام | بازار هوشمند</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏪</text></svg>">
+<link rel="stylesheet" href="/css/p3.css">
+</head>
+<body class="p3">
+
+<header class="p3-header">
+  <div class="p3-wrap p3-header__row">
+    <a class="p3-brand" href="/"><span class="logo">🏪</span><span data-i18n="brand">بازار هوشمند</span></a>
+    <nav class="p3-nav">
+      <a href="/" data-i18n="nav_store">فروشگاه</a>
+      <a href="/ads" data-i18n="nav_ads">تبلیغات</a>
+      <a href="/business" data-i18n="nav_business">بانک اصناف</a>
+      <a href="/privacy" data-i18n="nav_privacy">حریم خصوصی</a>
+      <select id="langSelect" aria-label="زبان" class="p3-btn p3-btn--ghost p3-btn--small">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+    </nav>
+  </div>
+</header>
+
+<main class="p3-wrap p3-main">
+  <div class="p3-card p3-gate">
+    <h1 data-i18n="login_title">ورود و ثبت‌نام</h1>
+    <p class="p3-hint" data-i18n="login_sub"></p>
+
+    <div class="p3-tabs" role="tablist" style="margin-top:14px">
+      <button type="button" id="modeLogin" role="tab" aria-selected="true" data-i18n="tab_login">ورود</button>
+      <button type="button" id="modeRegister" role="tab" aria-selected="false" data-i18n="tab_register">ثبت‌نام</button>
+    </div>
+
+    <form id="phoneForm" novalidate>
+      <div class="p3-field">
+        <label for="phone" data-i18n="phone">شماره تلفن همراه</label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" placeholder="09121234567" required>
+        <p class="p3-hint" data-i18n="phone_hint"></p>
+      </div>
+
+      <div id="registerFields" hidden>
+        <div class="p3-field">
+          <label for="name" data-i18n="name">نام و نام خانوادگی</label>
+          <input id="name" name="name" type="text" autocomplete="name" required>
+        </div>
+        <div class="p3-field">
+          <label for="role" data-i18n="role">نوع حساب</label>
+          <select id="role" name="role">
+            <option value="customer" data-i18n="role_customer">خریدار</option>
+            <option value="seller" data-i18n="role_seller">فروشنده</option>
+          </select>
+        </div>
+        <div id="sellerFields" hidden>
+          <div class="p3-field">
+            <label for="storeName" data-i18n="store_name">نام کسب‌وکار</label>
+            <input id="storeName" name="storeName" type="text">
+          </div>
+          <div class="p3-grid p3-grid--2">
+            <div class="p3-field">
+              <label for="industry" data-i18n="industry">صنف</label>
+              <select id="industry" name="industry"></select>
+            </div>
+            <div class="p3-field">
+              <label for="city" data-i18n="city">شهر</label>
+              <input id="city" name="city" type="text">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="p3-btn" id="requestBtn" type="submit" style="width:100%" data-i18n="send_code">ارسال کد تأیید</button>
+    </form>
+
+    <form id="codeForm" hidden novalidate>
+      <div id="codeNote" class="p3-note" hidden></div>
+      <div class="p3-field">
+        <label for="code" data-i18n="code">کد تأیید ۶ رقمی</label>
+        <input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="6" required>
+      </div>
+      <button class="p3-btn" id="verifyBtn" type="submit" style="width:100%" data-i18n="verify">تأیید و ورود</button>
+      <div class="p3-row" style="margin-top:10px">
+        <button class="p3-btn p3-btn--ghost p3-btn--small" id="backBtn" type="button" data-i18n="resend">ارسال دوبارهٔ کد</button>
+        <button class="p3-btn p3-btn--ghost p3-btn--small" id="editPhoneBtn" type="button">✎</button>
+      </div>
+    </form>
+
+    <p class="p3-hint" id="status" role="status" aria-live="polite"></p>
+    <hr class="p3-sep">
+    <p class="p3-hint" data-i18n="test_mode"></p>
+  </div>
+</main>
+
+<script type="module" src="/js/login.js"></script>
+</body>
+</html>
