@@ -1646,11 +1646,568 @@ export function createApp() {
 
   app.post('/api/finance/security/logout-all', requireOwner, reportLimiter, (req, res) => {
     const db = getDb();
+    const revoked = revokeAllSessions(db, req.user.id);
     req.user.sessionFrom = new Date().toISOString();
+    setSessionCookie(res, req.user, req);
+    audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'sessions_revoked', target: req.user.id, meta: { revoked }, ip: req.ip });
     saveDbSoon();
-    setSessionCookie(res, req.user);
-    audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'sessions_revoked', target: req.user.id, meta: {}, ip: req.ip });
-    res.json({ ok: true, sessionsRevokedAt: req.user.sessionFrom });
+    res.json({ ok: true, sessionsRevokedAt: req.user.sessionFrom, revoked });
+  });
+
+  /* ============ فاز چهارم: پشتیبان‌گیری رمزگذاری‌شده و بازیابی ============ */
+
+  const backupView = (row) => ({
+    id: row.id,
+    createdAt: row.createdAt,
+    reason: row.reason,
+    size: row.size,
+    fingerprint: row.fingerprint,
+    chain: row.chain,
+    environment: row.environment,
+    verifiedAt: row.verifiedAt || null,
+    downloadUrl: `/api/finance/backup/${row.id}/download`,
+  });
+  const safeFingerprint = () => {
+    try {
+      return backupFingerprint();
+    } catch {
+      return null;
+    }
+  };
+  const backupRowFor = (db, made, saved, reason, createdBy) => ({
+    id: id(),
+    createdAt: made.header.createdAt,
+    reason,
+    size: saved.size,
+    fingerprint: made.header.fingerprint,
+    chain: made.header.chain,
+    environment: made.header.environment,
+    counts: made.header.counts,
+    file: saved.name,
+    verifiedAt: made.header.createdAt,
+    createdBy,
+  });
+  const findBackup = (db, backupId) => (Array.isArray(db.backupHistory) ? db.backupHistory : [])
+    .find((row) => row.id === backupId) || null;
+  const backupError = (res, err) => {
+    if (err instanceof BackupError) return res.status(err.status).json({ error: err.code });
+    throw err;
+  };
+
+  app.get('/api/finance/backup/status', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const history = (Array.isArray(db.backupHistory) ? db.backupHistory : []).slice(-20).reverse();
+    const cfg = db.settings?.backup || {};
+    res.json({
+      encryption: { algorithm: 'aes-256-gcm', kdf: 'scrypt', keySource: backupKeySource(), keyIndependentFromSession: true },
+      fingerprint: safeFingerprint(),
+      schedule: {
+        enabled: Boolean(cfg.enabled),
+        intervalHours: Math.max(1, Number(cfg.intervalHours) || 24),
+        retention: Math.max(1, Number(cfg.retention) || 7),
+        updatedAt: cfg.updatedAt || null,
+      },
+      history: history.map(backupView),
+      lastBackupAt: history[0]?.createdAt || null,
+      count: history.length,
+      storage: 'data/backups',
+      persistentDisk: false,
+      limitation: 'در پلن رایگان دیسک پایدار وجود ندارد؛ فایل پشتیبان تا بازاستقرار بعدی روی همین نمونه می‌ماند. برای نگهداری بلندمدت، فایل را دانلود کنید.',
+    });
+  });
+
+  app.post('/api/finance/backup/create', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const includeSecrets = req.body?.includeSecrets === true;
+    if (includeSecrets) {
+      const second = verifySecondFactor(req, db);
+      if (!second.ok) return res.status(second.status).json({ error: second.error });
+    }
+    let made;
+    try {
+      made = createBackup(db, { reason: clean(req.body?.reason, 40) || 'manual', includeSecrets });
+    } catch (err) {
+      return backupError(res, err);
+    }
+    const saved = saveBackupFile(made.buffer, made.filename);
+    const row = backupRowFor(db, made, saved, made.header.reason, req.user.id);
+    db.backupHistory = [...(Array.isArray(db.backupHistory) ? db.backupHistory : []), row].slice(-50);
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'backup_created', target: row.id,
+      meta: { size: row.size, reason: row.reason }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.status(201).json({ backup: backupView(row) });
+  });
+
+  app.get('/api/finance/backup/:id/download', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const row = findBackup(db, req.params.id);
+    if (!row) return res.status(404).json({ error: 'not_found' });
+    try {
+      const buffer = readBackupFile(row.file);
+      audit(db, {
+        actorId: req.user.id, actorRole: req.user.role, action: 'backup_downloaded', target: row.id,
+        meta: { size: buffer.length }, ip: req.ip,
+      });
+      saveDbSoon();
+      res.setHeader('content-type', 'application/octet-stream');
+      res.setHeader('content-disposition', `attachment; filename="${row.file}"`);
+      return res.send(buffer);
+    } catch (err) {
+      return backupError(res, err);
+    }
+  });
+
+  app.post('/api/finance/backup/verify', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const row = findBackup(db, req.body?.id);
+    if (!row) return res.status(404).json({ error: 'not_found' });
+    try {
+      const result = verifyBackup(readBackupFile(row.file));
+      row.verifiedAt = new Date().toISOString();
+      audit(db, {
+        actorId: req.user.id, actorRole: req.user.role, action: 'backup_verified', target: row.id,
+        meta: { chainValid: result.chain.valid }, ip: req.ip,
+      });
+      saveDbSoon();
+      return res.json({ ok: true, backup: backupView(row), counts: result.counts, chain: result.chain, environment: result.environment });
+    } catch (err) {
+      return backupError(res, err);
+    }
+  });
+
+  app.post('/api/finance/backup/restore', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const row = findBackup(db, req.body?.id);
+    if (!row) return res.status(404).json({ error: 'not_found' });
+    let restored;
+    try {
+      restored = readBackupForRestore(readBackupFile(row.file));
+    } catch (err) {
+      return backupError(res, err);
+    }
+    const current = {
+      counts: Object.fromEntries(Object.entries(db).filter(([, value]) => Array.isArray(value)).map(([key, value]) => [key, value.length])),
+      chain: verifyChain(db),
+      environment: currentMode(db),
+    };
+    if (req.body?.mode !== 'apply') {
+      audit(db, {
+        actorId: req.user.id, actorRole: req.user.role, action: 'backup_restore_preview', target: row.id,
+        meta: { entries: restored.chain.entries }, ip: req.ip,
+      });
+      saveDbSoon();
+      return res.json({
+        mode: 'dry-run',
+        ok: true,
+        backup: backupView(row),
+        current,
+        restored: {
+          counts: restored.counts,
+          chain: restored.chain,
+          createdAt: restored.header.createdAt,
+          environment: restored.environment,
+        },
+      });
+    }
+    if (String(req.body?.confirm || '') !== 'RESTORE') return res.status(400).json({ error: 'confirm_required' });
+    const second = verifySecondFactor(req, db);
+    if (!second.ok) return res.status(second.status).json({ error: second.error });
+
+    // عکس فوری پیش از بازیابی تا امکان بازگشت وجود داشته باشد
+    let snapshot = null;
+    try {
+      const made = createBackup(db, { reason: 'pre-restore' });
+      const saved = saveBackupFile(made.buffer, `pre-restore-${Date.now()}.sbbak`);
+      snapshot = backupRowFor(db, made, saved, 'pre-restore', req.user.id);
+    } catch (err) {
+      return backupError(res, err);
+    }
+    const historyBefore = Array.isArray(db.backupHistory) ? db.backupHistory.slice() : [];
+    const next = restored.data;
+    replaceDb(next);
+    const dbAfter = getDb();
+    dbAfter.backupHistory = [...historyBefore, snapshot].slice(-50);
+    audit(dbAfter, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'backup_restored', target: row.id,
+      meta: { preRestoreBackup: snapshot.id, entries: restored.chain.entries }, ip: req.ip,
+    });
+    recordSecurityEvent({
+      type: 'backup_restored', severity: 'critical', ip: req.ip, identity: req.user.email,
+      path: '/api/finance/backup/restore', detail: `backup=${row.id}`,
+    });
+    saveDb();
+    return res.json({
+      ok: true,
+      mode: 'apply',
+      restored: { counts: restored.counts, chain: restored.chain, environment: restored.environment },
+      preRestoreBackup: snapshot.id,
+    });
+  });
+
+  app.post('/api/finance/backup/schedule', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    if (!db.settings) db.settings = {};
+    const current = db.settings.backup || {};
+    const enabled = req.body?.enabled === undefined ? Boolean(current.enabled) : Boolean(req.body.enabled);
+    const intervalHours = Math.max(1, Math.min(168, Number(req.body?.intervalHours ?? current.intervalHours ?? 24) || 24));
+    const retention = Math.max(1, Math.min(30, Number(req.body?.retention ?? current.retention ?? 7) || 7));
+    db.settings.backup = { enabled, intervalHours, retention, updatedAt: new Date().toISOString() };
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'backup_schedule_updated', target: 'settings',
+      meta: { enabled, intervalHours, retention }, ip: req.ip,
+    });
+    saveDbSoon();
+    startBackupScheduler();
+    res.json({ schedule: { enabled, intervalHours, retention, updatedAt: db.settings.backup.updatedAt } });
+  });
+
+  app.post('/api/finance/backup/run-now', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    let row;
+    try {
+      row = runScheduledBackup(db, { force: true });
+    } catch (err) {
+      return backupError(res, err);
+    }
+    res.status(201).json({ backup: backupView(row) });
+  });
+
+  /* ================= فاز چهارم: نشست‌ها و کدهای بازیابی ================= */
+
+  app.get('/api/finance/sessions', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const sid = currentSessionId(req);
+    res.json({
+      current: sid,
+      sessions: listSessions(db, req.user.id).slice(0, 20).map((row) => sessionView(row, sid)),
+    });
+  });
+
+  app.delete('/api/finance/sessions/:id', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const row = revokeSession(db, req.user.id, req.params.id, 'owner');
+    if (!row) return res.status(404).json({ error: 'not_found' });
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'session_revoked', target: row.id,
+      meta: { ip: row.ip }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.json({ ok: true, session: sessionView(row, currentSessionId(req)) });
+  });
+
+  app.post('/api/finance/sessions/revoke-others', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const sid = currentSessionId(req);
+    const revoked = revokeOtherSessions(db, req.user.id, sid);
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'sessions_revoked', target: req.user.id,
+      meta: { revoked, scope: 'others' }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.json({ ok: true, revoked });
+  });
+
+  app.get('/api/auth/sessions', requireAuth, (req, res) => {
+    const db = getDb();
+    const sid = currentSessionId(req);
+    res.json({ sessions: listSessions(db, req.user.id).slice(0, 20).map((row) => sessionView(row, sid)) });
+  });
+
+  app.delete('/api/auth/sessions/:id', requireAuth, (req, res) => {
+    const db = getDb();
+    const row = revokeSession(db, req.user.id, req.params.id, 'user');
+    if (!row) return res.status(404).json({ error: 'not_found' });
+    res.json({ ok: true, session: sessionView(row, currentSessionId(req)) });
+  });
+
+  app.post('/api/auth/sessions/revoke-others', requireAuth, (req, res) => {
+    const db = getDb();
+    const revoked = revokeOtherSessions(db, req.user.id, currentSessionId(req));
+    res.json({ ok: true, revoked });
+  });
+
+  app.get('/api/finance/recovery/status', requireOwner, financeLimiter, (req, res) => {
+    res.json({ recovery: recoveryCodeCount(req.user) });
+  });
+
+  app.post('/api/finance/recovery/generate', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const second = verifySecondFactor(req, db);
+    if (!second.ok) return res.status(second.status).json({ error: second.error });
+    const codes = generateRecoveryCodes(db, req.user);
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'recovery_codes_generated', target: req.user.id,
+      meta: { count: codes.length }, ip: req.ip,
+    });
+    recordSecurityEvent({
+      type: 'recovery_codes_generated', severity: 'warning', ip: req.ip, identity: req.user.email,
+      path: req.path, detail: `count=${codes.length}`,
+    });
+    saveDbSoon();
+    res.status(201).json({ codes, recovery: recoveryCodeCount(req.user), shownOnce: true });
+  });
+
+  app.post('/api/auth/recovery/login', authLimiter, (req, res) => {
+    const db = getDb();
+    const email = clean(req.body?.email, 120).toLowerCase();
+    const code = String(req.body?.code || '');
+    const attempt = loginStatus(req, email);
+    if (attempt.blocked) {
+      recordSecurityEvent({
+        type: 'login_blocked', severity: 'warning', ip: req.ip, identity: email,
+        path: '/api/auth/recovery/login', detail: 'recovery',
+      });
+      return res.status(429).json({ error: 'too_many_attempts' });
+    }
+    const user = db.users.find((item) => item.email === email);
+    if (!user || !verifyRecoveryCode(db, user, code)) {
+      registerLoginFailure(req, email);
+      recordSecurityEvent({
+        type: 'recovery_failed', severity: 'warning', ip: req.ip, identity: email,
+        path: '/api/auth/recovery/login', detail: 'invalid_code',
+      });
+      return res.status(401).json({ error: 'invalid_recovery_code' });
+    }
+    if (user.status === 'blocked') return res.status(403).json({ error: 'account_blocked' });
+    clearLoginFailures(req, email);
+    user.lastLoginAt = new Date().toISOString();
+    setSessionCookie(res, user, req);
+    recordSecurityEvent({
+      type: 'recovery_login', severity: 'critical', ip: req.ip, identity: email,
+      path: '/api/auth/recovery/login', detail: `remaining=${recoveryCodeCount(user).remaining}`,
+    });
+    saveDbSoon();
+    res.json({ user: publicUser(user), recovery: recoveryCodeCount(user) });
+  });
+
+  /* ==================== فاز چهارم: WebAuthn / Passkey ==================== */
+
+  const requestOrigin = (req) => {
+    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim() || 'http';
+    return `${proto}://${req.get('host') || 'localhost'}`;
+  };
+  const requestRpId = (req) => String(req.get('host') || 'localhost').split(':')[0];
+  const webauthnError = (res, err) => {
+    if (err instanceof WebAuthnError) return res.status(err.status).json({ error: err.code });
+    throw err;
+  };
+
+  app.get('/api/finance/webauthn/credentials', requireOwner, financeLimiter, (req, res) => {
+    const list = Array.isArray(req.user.passkeys) ? req.user.passkeys : [];
+    res.json({ credentials: list.map(credentialView) });
+  });
+
+  app.post('/api/finance/webauthn/register/options', requireOwner, reportLimiter, (req, res) => {
+    const challenge = issueChallenge('register');
+    const existing = (Array.isArray(req.user.passkeys) ? req.user.passkeys : [])
+      .map((cred) => ({ type: 'public-key', id: cred.id }));
+    res.json({
+      challenge,
+      rp: { id: requestRpId(req), name: 'Smart Bazaar' },
+      user: {
+        id: Buffer.from(req.user.id).toString('base64url'),
+        name: req.user.email || req.user.phone || req.user.id,
+        displayName: req.user.name || req.user.email || 'Owner',
+      },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+      timeout: 60000,
+      attestation: 'none',
+      authenticatorSelection: { residentKey: 'preferred', userVerification: 'preferred' },
+      excludeCredentials: existing,
+      origin: requestOrigin(req),
+    });
+  });
+
+  app.post('/api/finance/webauthn/register/verify', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const credential = req.body?.credential || req.body || {};
+    const response = credential.response || {};
+    if (!consumeChallenge(req.body?.challenge, 'register')) return res.status(400).json({ error: 'challenge_invalid' });
+    let result;
+    try {
+      result = verifyRegistration({
+        clientDataJSON: response.clientDataJSON,
+        attestationObject: response.attestationObject,
+        expectedChallenge: req.body?.challenge,
+        expectedOrigin: requestOrigin(req),
+        rpId: requestRpId(req),
+      });
+    } catch (err) {
+      return webauthnError(res, err);
+    }
+    if (!Array.isArray(req.user.passkeys)) req.user.passkeys = [];
+    if (req.user.passkeys.some((item) => item.id === result.credentialId)) {
+      return res.status(409).json({ error: 'credential_exists' });
+    }
+    const record = {
+      id: result.credentialId,
+      publicKeyJwk: result.publicKeyJwk,
+      signCount: result.signCount,
+      label: clean(req.body?.label, 40) || 'Passkey',
+      transports: Array.isArray(credential.transports) ? credential.transports.slice(0, 5) : [],
+      createdAt: new Date().toISOString(),
+      lastUsedAt: null,
+    };
+    req.user.passkeys.push(record);
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'passkey_registered', target: record.id,
+      meta: { label: record.label }, ip: req.ip,
+    });
+    recordSecurityEvent({
+      type: 'passkey_registered', severity: 'warning', ip: req.ip, identity: req.user.email,
+      path: req.path, detail: record.label,
+    });
+    saveDbSoon();
+    res.status(201).json({ credential: credentialView(record), credentials: req.user.passkeys.map(credentialView) });
+  });
+
+  app.delete('/api/finance/webauthn/credentials/:id', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const list = Array.isArray(req.user.passkeys) ? req.user.passkeys : [];
+    const index = list.findIndex((item) => item.id === req.params.id);
+    if (index < 0) return res.status(404).json({ error: 'not_found' });
+    const [removed] = list.splice(index, 1);
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'passkey_removed', target: removed.id,
+      meta: { label: removed.label }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.json({ ok: true, credentials: list.map(credentialView) });
+  });
+
+  app.post('/api/auth/webauthn/login/options', authLimiter, (req, res) => {
+    const db = getDb();
+    const email = clean(req.body?.email, 120).toLowerCase();
+    const user = db.users.find((item) => item.email === email);
+    const list = user && Array.isArray(user.passkeys) ? user.passkeys : [];
+    if (!user || list.length === 0) return res.status(404).json({ error: 'passkey_not_available' });
+    const challenge = issueChallenge('login');
+    res.json({
+      challenge,
+      rpId: requestRpId(req),
+      timeout: 60000,
+      userVerification: 'preferred',
+      allowCredentials: list.map((cred) => ({ type: 'public-key', id: cred.id })),
+      origin: requestOrigin(req),
+    });
+  });
+
+  app.post('/api/auth/webauthn/login/verify', authLimiter, (req, res) => {
+    const db = getDb();
+    const email = clean(req.body?.email, 120).toLowerCase();
+    const user = db.users.find((item) => item.email === email);
+    if (!user) return res.status(401).json({ error: 'passkey_invalid' });
+    const credential = req.body?.credential || {};
+    const response = credential.response || {};
+    const stored = (Array.isArray(user.passkeys) ? user.passkeys : [])
+      .find((item) => item.id === String(credential.id || credential.rawId || ''));
+    if (!stored) return res.status(401).json({ error: 'passkey_invalid' });
+    if (!consumeChallenge(req.body?.challenge, 'login')) return res.status(400).json({ error: 'challenge_invalid' });
+    let result;
+    try {
+      result = verifyAssertion({
+        clientDataJSON: response.clientDataJSON,
+        authenticatorData: response.authenticatorData,
+        signature: response.signature,
+        expectedChallenge: req.body?.challenge,
+        expectedOrigin: requestOrigin(req),
+        rpId: requestRpId(req),
+        publicKeyJwk: stored.publicKeyJwk,
+        storedSignCount: stored.signCount,
+      });
+    } catch (err) {
+      recordSecurityEvent({
+        type: 'passkey_failed', severity: 'warning', ip: req.ip, identity: email,
+        path: req.path, detail: err.code || 'invalid',
+      });
+      return webauthnError(res, err);
+    }
+    stored.signCount = Math.max(Number(stored.signCount) || 0, result.signCount);
+    stored.lastUsedAt = new Date().toISOString();
+    user.lastLoginAt = stored.lastUsedAt;
+    setSessionCookie(res, user, req);
+    recordSecurityEvent({
+      type: 'passkey_login', severity: 'info', ip: req.ip, identity: email,
+      path: req.path, detail: stored.label || 'passkey',
+    });
+    saveDbSoon();
+    res.json({ user: publicUser(user) });
+  });
+
+  /* ================= فاز چهارم: محیط دمو/واقعی و نظارت ================= */
+
+  app.get('/api/env', (req, res) => {
+    res.json(envSummary(getDb()));
+  });
+
+  app.post('/api/finance/environment', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const mode = String(req.body?.mode || '');
+    if (String(req.body?.confirm || '') !== 'SWITCH') return res.status(400).json({ error: 'confirm_required' });
+    const second = verifySecondFactor(req, db);
+    if (!second.ok) return res.status(second.status).json({ error: second.error });
+    try {
+      setMode(db, mode);
+    } catch (err) {
+      if (err instanceof EnvError) return res.status(err.status).json({ error: err.code });
+      throw err;
+    }
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'environment_changed', target: mode,
+      meta: { previous: currentMode(db) }, ip: req.ip,
+    });
+    recordSecurityEvent({
+      type: 'environment_changed', severity: 'critical', ip: req.ip, identity: req.user.email,
+      path: req.path, detail: mode,
+    });
+    saveDb();
+    res.json({ env: envSummary(db) });
+  });
+
+  app.get('/api/finance/monitor/overview', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    res.json(monitorOverview(db, {
+      from: req.query.from, to: req.query.to, type: req.query.type,
+      severity: req.query.severity, q: req.query.q,
+    }));
+  });
+
+  app.get('/api/finance/monitor/alerts', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    res.json({ config: alertConfig(db), alerts: recentAlerts(db, 20) });
+  });
+
+  app.post('/api/finance/monitor/alerts', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    let config;
+    try {
+      config = setAlertConfig(db, {
+        enabled: req.body?.enabled,
+        webhookUrl: req.body?.webhookUrl,
+        minSeverity: req.body?.minSeverity,
+      });
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.code || 'invalid_alert_config' });
+    }
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'alert_config_updated', target: 'settings',
+      meta: { enabled: config.enabled, minSeverity: config.minSeverity, hasWebhook: Boolean(config.webhookUrl) }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.json({ config });
+  });
+
+  app.post('/api/finance/monitor/test-alert', requireOwner, reportLimiter, async (req, res) => {
+    const db = getDb();
+    const alert = await dispatchAlert(db, {
+      type: 'test',
+      severity: 'warning',
+      title: 'آزمون کانال هشدار بازار هوشمند',
+      detail: 'این پیام آزمایشی است و هیچ اقدام مالی انجام نمی‌دهد.',
+    });
+    res.status(alert.delivered ? 200 : 409).json({ alert, config: alertConfig(db) });
   });
 
   app.get('/api/finance/team', requireOwner, financeLimiter, (req, res) => {
@@ -2488,6 +3045,11 @@ export function createApp() {
     if (!req.user) return res.redirect('/?next=/finance');
     if (!isOwner(getDb(), req.user)) return res.status(403).type('html').send(deniedHtml);
     return res.sendFile(path.join(PUBLIC_DIR, 'finance.html'));
+  });
+  app.get('/security', (req, res) => {
+    if (!req.user) return res.redirect('/?next=/security');
+    if (!isOwner(getDb(), req.user)) return res.status(403).type('html').send(deniedHtml);
+    return res.sendFile(path.join(PUBLIC_DIR, 'security.html'));
   });
   app.get('/report/:token', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'report.html')));
   app.get('/login', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'login.html')));
