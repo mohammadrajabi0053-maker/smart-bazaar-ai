@@ -29,13 +29,14 @@ test.after(() => {
 
 function client() {
   let cookie = '';
-  return async (pathname, { method = 'GET', body } = {}) => {
+  return async (pathname, { method = 'GET', body, redirect = 'follow' } = {}) => {
     const headers = {};
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (cookie) headers.cookie = cookie;
     const res = await fetch(base + pathname, {
       method,
       headers,
+      redirect,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const setCookie = res.headers.getSetCookie?.() || [];
@@ -93,9 +94,11 @@ test('دسترسی مالی فقط برای مدیر اصلی: ۴۰۱ بی‌ن�
   }
 
   // صفحهٔ مالی برای بی‌نشست ریدایرکت و برای غیرمالک مسدود می‌شود
-  const pageAnon = await anon('/finance');
+  const pageAnon = await anon('/finance', { redirect: 'manual' });
   assert.equal(pageAnon.status, 302);
   assert.match(pageAnon.headers.get('location') || '', /next=\/finance/);
+  const htmlAnon = await anon('/finance.html', { redirect: 'manual' });
+  assert.equal(htmlAnon.status, 302);
   const pageShopper = await shopper('/finance');
   assert.equal(pageShopper.status, 403);
   assert.match(pageShopper.text, /فقط برای مدیر اصلی/);
