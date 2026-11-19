@@ -350,6 +350,83 @@ async function runKeywords() {
   }
 }
 
+/* ------------------------------- پروفایل ------------------------------- */
+
+const PROFILE_ERRORS = {
+  store_name_required: 'نام کسب‌وکار الزامی است',
+  industry_invalid: 'صنف را انتخاب کنید',
+  country_invalid: 'کشور را انتخاب کنید',
+  city_required: 'شهر الزامی است',
+  website_invalid: 'آدرس وب‌سایت معتبر نیست (با https:// شروع شود)',
+};
+
+let profileCatalog = null;
+
+async function loadProfileCatalog() {
+  if (profileCatalog) return profileCatalog;
+  try { profileCatalog = await api('/api/directory/catalog'); } catch { profileCatalog = null; }
+  return profileCatalog;
+}
+
+function fillProfileSelect(selector, rows, current) {
+  const el = $(selector);
+  if (!el) return;
+  const lang = getLang();
+  el.innerHTML = (rows || []).map((row) => {
+    const value = row.slug || row.code;
+    const label = row[lang] || row.fa || row.name || value;
+    return `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(label)}</option>`;
+  }).join('');
+}
+
+async function loadProfile() {
+  const catalog = await loadProfileCatalog();
+  try {
+    const { profile } = await api('/api/seller/profile');
+    fillProfileSelect('#pfIndustry', catalog?.industries || [], profile.industry);
+    fillProfileSelect('#pfCountry', catalog?.countries || [], profile.country || 'IR');
+    $('#pfBusiness').value = profile.businessName || '';
+    $('#pfProvince').value = profile.province || '';
+    $('#pfCity').value = profile.city || '';
+    $('#pfAddress').value = profile.address || '';
+    $('#pfWhatsapp').value = profile.whatsapp || '';
+    $('#pfTelegram').value = profile.telegram || '';
+    $('#pfInstagram').value = profile.instagram || '';
+    $('#pfWebsite').value = profile.website || '';
+    $('#pfPhone').textContent = profile.phone || '—';
+    $('#profileStatus').textContent = '';
+  } catch (err) {
+    $('#profileStatus').textContent = err.message;
+  }
+}
+
+async function saveProfile(event) {
+  event.preventDefault();
+  const status = $('#profileStatus');
+  status.textContent = 'در حال ذخیره…';
+  try {
+    const { profile } = await api('/api/seller/profile', {
+      method: 'PUT',
+      body: {
+        businessName: $('#pfBusiness').value.trim(),
+        industry: $('#pfIndustry').value,
+        country: $('#pfCountry').value,
+        province: $('#pfProvince').value.trim(),
+        city: $('#pfCity').value.trim(),
+        address: $('#pfAddress').value.trim(),
+        whatsapp: $('#pfWhatsapp').value.trim(),
+        telegram: $('#pfTelegram').value.trim(),
+        instagram: $('#pfInstagram').value.trim(),
+        website: $('#pfWebsite').value.trim(),
+      },
+    });
+    status.textContent = 'پروفایل ذخیره شد ✓';
+    $('#storeName').textContent = profile.businessName || $('#pfBusiness').value.trim();
+  } catch (err) {
+    status.textContent = PROFILE_ERRORS[err.message] || err.message;
+  }
+}
+
 /* -------------------------------- تب‌ها -------------------------------- */
 
 function switchTab(tab) {
@@ -358,6 +435,7 @@ function switchTab(tab) {
   if (tab === 'products') loadProducts().catch(() => {});
   if (tab === 'orders') loadOrders($('#orderFilter').value).catch(() => {});
   if (tab === 'dash') loadOverview().catch(() => {});
+  if (tab === 'profile') loadProfile().catch(() => {});
 }
 
 /* --------------------------------- شروع --------------------------------- */
@@ -382,6 +460,7 @@ function bind() {
 
   $('#newProductBtn').addEventListener('click', () => openForm(null));
   $('#productForm').addEventListener('submit', submitProduct);
+  $('#profileForm').addEventListener('submit', saveProfile);
 
   $('#productRows').addEventListener('click', (e) => {
     const edit = e.target.closest('[data-edit]');
