@@ -42,7 +42,7 @@ import {
 import { alertConfig, dispatchAlert, monitorOverview, recentAlerts, setAlertConfig } from './src/monitor.js';
 import {
   attachUser, requireAuth, requireRole, setSessionCookie, clearSessionCookie,
-  publicUser, hashPassword, verifyPassword, parseCookies, currentSessionId,
+  publicUser, hashPassword, verifyPassword, parseCookies, currentSessionId, rotateCurrentSession,
 } from './src/auth.js';
 import {
   BackupError, backupFingerprint, backupKeySource, createBackup, createRecoveryKit, installKeys,
@@ -1638,6 +1638,7 @@ export function createApp() {
     req.user.totp = { enabled: true, secret: encryptJson({ secret: pending.secret }), enabledAt: new Date().toISOString() };
     req.user.totpPending = null;
     resetFailedTotp(db);
+    rotateCurrentSession(req, res, req.user);
     audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'totp_enabled', target: req.user.id, meta: {}, ip: req.ip });
     saveDbSoon();
     res.json({ twoFactor: { enabled: true, enabledAt: req.user.totp.enabledAt } });
@@ -1649,6 +1650,7 @@ export function createApp() {
     if (!second.ok) return res.status(second.status).json({ error: second.error });
     req.user.totp = null;
     req.user.totpPending = null;
+    rotateCurrentSession(req, res, req.user);
     audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'totp_disabled', target: req.user.id, meta: {}, ip: req.ip });
     saveDbSoon();
     res.json({ twoFactor: { enabled: false } });
@@ -1879,6 +1881,8 @@ export function createApp() {
     const uploadsRestored = restoreUploads(restored.uploads);
     const keysRestored = restored.chainKeyHex ? installKeys({ chainKeyHex: restored.chainKeyHex }) : null;
     const dbAfter = getDb();
+    // چرخش شناسهٔ نشست پس از بازیابی داده (عملیات حساس)
+    rotateCurrentSession(req, res, { id: req.user.id, role: req.user.role });
     dbAfter.backupHistory = [...historyBefore, snapshot].slice(-50);
     audit(dbAfter, {
       actorId: req.user.id, actorRole: req.user.role, action: 'backup_restored', target: row.id,
@@ -2060,6 +2064,7 @@ export function createApp() {
         return backupError(res, err);
       }
       const installed = installKeys({ backupKeyHex: kit.backupKeyHex, chainKeyHex: kit.chainKeyHex });
+      rotateCurrentSession(req, res, req.user);
       audit(db, {
         actorId: req.user.id, actorRole: req.user.role, action: 'recovery_kit_installed', target: 'keys',
         meta: { fingerprint: installed.fingerprint }, ip: req.ip,
