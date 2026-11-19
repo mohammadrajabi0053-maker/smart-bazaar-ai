@@ -213,7 +213,7 @@
         <label class="fin-field"><span>از تاریخ</span><input id="monFrom" type="date"></label>
         <label class="fin-field"><span>تا تاریخ</span><input id="monTo" type="date"></label>
         <label class="fin-field"><span>شدت</span>
-          <select id="monSeverity"><option value="">همه</option><option value="info">info</option><option value="warning">warning</option><option value="critical">critical</option></select>
+          <select id="monSeverity"><option value="">همه</option><option value="info">اطلاع‌رسانی</option><option value="medium">متوسط</option><option value="high">بالا</option><option value="critical">بحرانی</option></select>
         </label>
         <label class="fin-field"><span>جست‌وجو</span><input id="monQ" placeholder="IP، ایمیل، نوع رویداد"></label>
         <button class="fin-btn" id="monApply" type="button">اعمال فیلتر</button>
@@ -228,7 +228,7 @@
     <div class="fin-block">
       <h2>رویدادهای امنیتی</h2>
       <div class="fin-table-wrap"><table class="fin-table" id="eventsTable">
-        <thead><tr><th>زمان</th><th>نوع</th><th>شدت</th><th>هویت</th><th>IP</th><th>مسیر</th></tr></thead>
+        <thead><tr><th>زمان</th><th>نوع</th><th>شدت</th><th>هویت</th><th>IP</th><th>مسیر</th><th>وضعیت بررسی</th></tr></thead>
         <tbody></tbody>
       </table></div>
     </div>
@@ -238,14 +238,14 @@
       <div class="fin-row">
         <label class="fin-check"><input type="checkbox" id="alertEnabled"> <span>فعال</span></label>
         <label class="fin-field"><span>حداقل شدت</span>
-          <select id="alertSeverity"><option value="info">info</option><option value="warning">warning</option><option value="critical">critical</option></select>
+          <select id="alertSeverity"><option value="info">اطلاع‌رسانی</option><option value="medium">متوسط</option><option value="high">بالا</option><option value="critical">بحرانی</option></select>
         </label>
         <label class="fin-field grow"><span>Webhook (اختیاری)</span><input id="alertWebhook" placeholder="https://example.com/hook"></label>
         <button class="fin-btn" id="alertSaveBtn" type="button">ذخیره</button>
         <button class="fin-btn ghost" id="alertTestBtn" type="button">آزمون کانال</button>
       </div>
       <p class="fin-note">ارسال هشدار به سرویس خارجی نیازمند آدرس معتبر و دسترسی شبکه است؛ بدون آن، هشدارها فقط در همین داشبورد ثبت و نمایش داده می‌شوند.</p>
-      <div class="fin-table-wrap"><table class="fin-table" id="alertTable"><thead><tr><th>زمان</th><th>عنوان</th><th>شدت</th><th>وضعیت ارسال</th></tr></thead><tbody></tbody></table></div>
+      <div class="fin-table-wrap"><table class="fin-table" id="alertTable"><thead><tr><th>زمان</th><th>عنوان</th><th>شدت</th><th>وضعیت ارسال</th><th>بررسی</th></tr></thead><tbody></tbody></table></div>
     </div>
   </section>
 

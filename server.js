@@ -39,7 +39,7 @@ import { EnvError, currentMode, envSummary, setMode } from './src/envmode.js';
 import {
   WebAuthnError, consumeChallenge, credentialView, issueChallenge, verifyAssertion, verifyRegistration,
 } from './src/webauthn.js';
-import { alertConfig, dispatchAlert, monitorOverview, recentAlerts, setAlertConfig } from './src/monitor.js';
+import { ackAlert, ackSecurityEvent, alertConfig, dispatchAlert, monitorOverview, normalizeSeverity, recentAlerts, setAlertConfig } from './src/monitor.js';
 import {
   attachUser, requireAuth, requireRole, setSessionCookie, clearSessionCookie,
   publicUser, hashPassword, verifyPassword, parseCookies, currentSessionId, rotateCurrentSession,
@@ -2381,6 +2381,36 @@ export function createApp() {
   app.get('/api/finance/monitor/alerts', requireOwner, financeLimiter, (req, res) => {
     const db = getDb();
     res.json({ config: alertConfig(db), alerts: recentAlerts(db, 20) });
+  });
+
+  // تأیید بررسی هشدار — فقط مالک، با ثبت در حسابرسی
+  app.post('/api/finance/monitor/alerts/:id/ack', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const alert = ackAlert(db, String(req.params.id || ''), req.user.email);
+    if (!alert) return res.status(404).json({ error: 'alert_not_found' });
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'alert_acknowledged', target: alert.id,
+      meta: { severity: normalizeSeverity(alert.severity), type: alert.type }, ip: req.ip,
+    });
+    recordSecurityEvent({
+      type: 'alert_acknowledged', severity: 'info', ip: req.ip, identity: req.user.email,
+      path: req.path, detail: alert.type || '',
+    });
+    saveDbSoon();
+    res.json({ alert: { ...alert, severity: normalizeSeverity(alert.severity) } });
+  });
+
+  // تأیید بررسی رویداد امنیتی — فقط مالک
+  app.post('/api/finance/monitor/events/:id/ack', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const event = ackSecurityEvent(db, String(req.params.id || ''), req.user.email);
+    if (!event) return res.status(404).json({ error: 'event_not_found' });
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'event_acknowledged', target: event.id,
+      meta: { type: event.type, severity: normalizeSeverity(event.severity) }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.json({ event: { ...event, severity: normalizeSeverity(event.severity) } });
   });
 
   app.post('/api/finance/monitor/alerts', requireOwner, reportLimiter, (req, res) => {
