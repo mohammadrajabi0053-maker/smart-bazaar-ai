@@ -213,6 +213,17 @@
       <button class="btn block" type="submit" data-i18n="submit">تأیید</button>
       <p class="hint" style="margin-top:8px" id="authHint"></p>
     </form>
+    <div class="auth-extra" style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:12px">
+      <button class="btn block" type="button" id="passkeyLoginBtn">ورود با Passkey / کلید امنیتی</button>
+      <details id="recoveryBox" style="margin-top:10px">
+        <summary style="cursor:pointer">ورود با کد بازیابی</summary>
+        <div class="field" style="margin-top:8px"><label for="recEmail">ایمیل</label><input id="recEmail" type="email" autocomplete="username"></div>
+        <div class="field"><label for="recCode">کد بازیابی</label><input id="recCode" autocomplete="one-time-code" placeholder="XXXX-XXXX"></div>
+        <button class="btn block" type="button" id="recoveryLoginBtn">ورود با کد بازیابی</button>
+        <p class="hint">هر کد فقط یک‌بار قابل استفاده است.</p>
+      </details>
+      <p class="hint" id="passkeyHint" style="margin-top:8px"></p>
+    </div>
   </div>
 </div>
 
