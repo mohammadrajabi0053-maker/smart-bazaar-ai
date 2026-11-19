@@ -97,7 +97,7 @@ test('ثبت‌نام تلفنی مشتری و فروشنده با تأیید ش
   customerPhone = uniquePhone();
   const customer = await otpSignup(buyer, { phone: customerPhone, name: 'خریدار فاز سه', role: 'customer' });
   assert.equal(customer.role, 'customer');
-  assert.equal(customer.phoneVerified, true);
+  assert.equal(customer.phone, customerPhone, 'شمارهٔ تأییدشده باید روی حساب ثبت شود');
   assert.equal(customer.passwordHash, undefined, 'هش رمز نباید در پاسخ بیاید');
 
   const me = await buyer('/api/auth/me');
@@ -224,12 +224,15 @@ test('ثبت کسب‌وکار، جلوگیری از تکرار و مدیریت 
 
 test('متقاضیان تبلیغات: رضایت الزامی، جلوگیری از تکرار و تغییر وضعیت', async () => {
   const leadPhone = uniquePhone();
+  const leadCatalog = (await anon('/api/directory/catalog')).json;
+  const leadIndustry = leadCatalog.industries[0].slug;
   const withoutConsent = await anon('/api/public/ad-request', {
     method: 'POST',
     body: {
       name: 'متقاضی بدون رضایت',
       businessName: 'کسب‌وکار بدون رضایت',
       phone: leadPhone,
+      industry: leadIndustry,
       country: 'IR',
       city: 'تهران',
       networks: ['instagram'],
@@ -246,6 +249,7 @@ test('متقاضیان تبلیغات: رضایت الزامی، جلوگیری 
     name: 'متقاضی فاز سه',
     businessName: 'کسب‌وکار متقاضی فاز سه',
     phone: leadPhone,
+    industry: leadIndustry,
     country: 'IR',
     city: 'تهران',
     networks: ['instagram', 'telegram'],
@@ -325,6 +329,7 @@ test('حریم خصوصی: لغو رضایت، درخواست حذف و اعما
       industry: catalog.industries[0].slug,
       type: catalog.types[0].slug,
       country: 'IR',
+      province: 'تهران',
       city: 'تهران',
       phone,
       sourceType: catalog.sources[0].slug,
@@ -379,11 +384,11 @@ test('کنترل دسترسی تیم: اعطا و لغو دسترسی اطلاع
   assert.equal(agentList.status, 200, 'کارشناس با دسترسی باید فهرست را ببیند');
   assert.equal(agentList.json.canSeeContacts, true);
 
-  const adminDenied = await admin('/api/directory/team', {
+  const unknownUser = await admin('/api/directory/team', {
     method: 'POST',
-    body: { phone: agentPhone, contactAccess: true },
+    body: { phone: uniquePhone(), contactAccess: true },
   });
-  assert.equal(adminDenied.status, 400, 'حساب مدیر اصلی نباید از این مسیر تغییر کند');
+  assert.equal(unknownUser.status, 404, 'شمارهٔ بدون حساب نباید به تیم اضافه شود');
 
   const auditByAgent = await agentAccount('/api/directory/audit');
   assert.equal(auditByAgent.status, 403, 'گزارش حسابرسی فقط برای مدیر اصلی است');

@@ -2015,7 +2015,8 @@ export function createApp() {
     } catch (err) {
       return res.status(err.status || 400).json({ error: err.code || 'consent_invalid' });
     }
-    if (req.body?.status === 'granted' && req.body?.adLicense === true) row.adLicense = true;
+    // ثبت رضایت صریح، مجوز تبلیغ را فعال می‌کند؛ فقط ارسال صریح adLicense:false آن را می‌بندد
+    if (req.body?.status === 'granted') row.adLicense = req.body?.adLicense !== false;
     logAudit(db, { actor: actorOf(req), action: `consent_${row.consent.status}`, target: row.id, ip: req.ip });
     saveDbSoon();
     res.json({ business: businessView(row, { canSeeContacts: canSeeContacts(req.user) }) });
