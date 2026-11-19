@@ -130,6 +130,7 @@ test('ثبت‌نام تلفنی مشتری و فروشنده با تأیید ش
 });
 
 test('پروفایل فروشنده ذخیره و اعتبارسنجی می‌شود', async () => {
+  const industry = (await anon('/api/directory/catalog')).json.industries[0].slug;
   const current = await sellerClient('/api/seller/profile');
   assert.equal(current.status, 200);
   assert.equal(current.json.profile.businessName, 'فروشگاه آزمایشی فاز سه');
@@ -138,7 +139,7 @@ test('پروفایل فروشنده ذخیره و اعتبارسنجی می‌ش
     method: 'PUT',
     body: {
       businessName: 'فروشگاه آزمایشی فاز سه',
-      industry: 'apparel',
+      industry,
       country: 'IR',
       province: 'تهران',
       city: 'تهران',
@@ -155,7 +156,7 @@ test('پروفایل فروشنده ذخیره و اعتبارسنجی می‌ش
 
   const invalid = await sellerClient('/api/seller/profile', {
     method: 'PUT',
-    body: { businessName: 'x', industry: 'apparel', country: 'IR', city: 'تهران' },
+    body: { businessName: 'x', industry, country: 'IR', city: 'تهران' },
   });
   assert.equal(invalid.status, 400, 'نام کوتاه کسب‌وکار باید رد شود');
   assert.equal(invalid.json.error, 'store_name_required');
