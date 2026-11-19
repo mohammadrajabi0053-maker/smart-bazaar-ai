@@ -387,6 +387,104 @@ export function readBackupFile(name) {
   return fs.readFileSync(file);
 }
 
+/* ---------- کیت بازیابی کلیدها (برای بازگرداندن پس از Redeploy) ---------- */
+
+const KIT_MAGIC = 'SBKEY1';
+const KIT_FORMAT = 'sb-key-kit-v1';
+
+/** ساخت کیت رمزگذاری‌شدهٔ کلیدها با گذرواژهٔ خود مالک (حداقل ۱۲ نویسه) */
+export function createRecoveryKit(passphrase, { now = new Date() } = {}) {
+  const pass = String(passphrase || '');
+  if (pass.length < 12) throw new BackupError('passphrase_weak', 400);
+  const salt = crypto.randomBytes(16);
+  const iv = crypto.randomBytes(12);
+  const header = {
+    format: KIT_FORMAT,
+    alg: 'aes-256-gcm',
+    kdf: { ...KDF, salt: salt.toString('hex') },
+    iv: iv.toString('hex'),
+    createdAt: now.toISOString(),
+    fingerprint: backupFingerprint(),
+  };
+  const headerJson = JSON.stringify(header);
+  const body = JSON.stringify({
+    backupKeyHex: backupKey().toString('hex'),
+    chainKeyHex: chainKey().toString('hex'),
+    createdAt: header.createdAt,
+  });
+  const key = crypto.scryptSync(pass, salt, KDF.keylen, {
+    N: KDF.N, r: KDF.r, p: KDF.p, maxmem: 64 * 1024 * 1024,
+  });
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(Buffer.from(headerJson, 'utf8'));
+  const enc = Buffer.concat([cipher.update(Buffer.from(body, 'utf8')), cipher.final()]);
+  const buffer = Buffer.from(
+    [KIT_MAGIC, headerJson, enc.toString('base64'), cipher.getAuthTag().toString('base64')].join('\n'),
+    'utf8',
+  );
+  return {
+    buffer,
+    header,
+    filename: `smart-bazaar-keys-${header.createdAt.slice(0, 10)}.sbkey`,
+    size: buffer.length,
+  };
+}
+
+/** خواندن کیت با گذرواژه؛ گذرواژهٔ اشتباه → kit_passphrase_invalid */
+export function readRecoveryKit(input, passphrase) {
+  const buffer = Buffer.isBuffer(input) ? input : Buffer.from(String(input || ''), 'utf8');
+  if (!buffer.length || buffer.length > 64 * 1024) throw new BackupError('kit_corrupt', 400);
+  const parts = buffer.toString('utf8').split('\n');
+  if (parts.length !== 4 || parts[0] !== KIT_MAGIC) throw new BackupError('kit_format_unknown', 400);
+  let header;
+  try {
+    header = JSON.parse(parts[1]);
+  } catch {
+    throw new BackupError('kit_corrupt', 400);
+  }
+  if (header?.format !== KIT_FORMAT || !header?.iv || !header?.kdf?.salt) throw new BackupError('kit_format_unknown', 400);
+  let plain;
+  try {
+    const key = crypto.scryptSync(String(passphrase || ''), Buffer.from(header.kdf.salt, 'hex'), KDF.keylen, {
+      N: header.kdf.N || KDF.N, r: header.kdf.r || KDF.r, p: header.kdf.p || KDF.p, maxmem: 64 * 1024 * 1024,
+    });
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(header.iv, 'hex'));
+    decipher.setAAD(Buffer.from(parts[1], 'utf8'));
+    decipher.setAuthTag(Buffer.from(parts[3], 'base64'));
+    plain = Buffer.concat([decipher.update(Buffer.from(parts[2], 'base64')), decipher.final()]);
+  } catch {
+    throw new BackupError('kit_passphrase_invalid', 400);
+  }
+  let kit;
+  try {
+    kit = JSON.parse(plain.toString('utf8'));
+  } catch {
+    throw new BackupError('kit_corrupt', 400);
+  }
+  if (!/^[0-9a-f]{64}$/i.test(String(kit?.backupKeyHex)) || !/^[0-9a-f]{64}$/i.test(String(kit?.chainKeyHex))) {
+    throw new BackupError('kit_corrupt', 400);
+  }
+  return { backupKeyHex: kit.backupKeyHex, chainKeyHex: kit.chainKeyHex, createdAt: kit.createdAt, header };
+}
+
+/** نصب کلیدهای بازیابی‌شده روی این نمونه (پس از Redeploy) */
+export function installKeys({ backupKeyHex, chainKeyHex } = {}) {
+  const out = { backupKey: false, chainKey: false, fingerprint: null };
+  if (/^[0-9a-f]{64}$/i.test(String(backupKeyHex || ''))) {
+    const clean = String(backupKeyHex).toLowerCase();
+    fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+    fs.writeFileSync(KEY_FILE, clean, { mode: 0o600 });
+    cachedKey = Buffer.from(clean, 'hex');
+    out.backupKey = true;
+  }
+  if (/^[0-9a-f]{64}$/i.test(String(chainKeyHex || ''))) {
+    installChainKey(String(chainKeyHex).toLowerCase());
+    out.chainKey = true;
+  }
+  out.fingerprint = backupFingerprint();
+  return out;
+}
+
 /** اجرای یک پشتیبان‌گیری زمان‌بندی‌شده با حفظ سقف نگهداری */
 export function runScheduledBackup(db = getDb(), { force = false } = {}) {
   const cfg = db.settings?.backup;
