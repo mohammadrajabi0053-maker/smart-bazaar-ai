@@ -22,7 +22,8 @@ import {
   advanceWithdrawal, appendEntry, audit, createGrant, createWithdrawal, decryptRecipient, ensureFinance,
   ensureOwnerFlag, entriesToCsv, filterEntries, findGrantByToken, grantReport, grantStatus, grantView,
   groupSeries, internalTransfer, isOwner, matchesFilter, recordAdsPipeline, recordStorefrontIncome,
-  registerFailedTotp, resetFailedTotp, seedDemoLedger, summarize, verifyChain, walletState,
+  chainFingerprint, chainKeySource, registerFailedTotp, resetFailedTotp, seedDemoLedger, summarize,
+  verifyChain, walletState,
 } from './src/finance.js';
 import {
   decryptJson, encryptJson, newTotpSecret, otpauthUrl, randomToken, sha256, verifyTotp,
@@ -44,8 +45,9 @@ import {
   publicUser, hashPassword, verifyPassword, parseCookies, currentSessionId,
 } from './src/auth.js';
 import {
-  BackupError, backupFingerprint, backupKeySource, createBackup, readBackupFile, readBackupForRestore,
-  runScheduledBackup, saveBackupFile, startBackupScheduler, verifyBackup,
+  BackupError, backupFingerprint, backupKeySource, createBackup, createRecoveryKit, installKeys,
+  readBackupFile, readBackupForRestore, readRecoveryKit, restoreUploads, runScheduledBackup,
+  saveBackupFile, startBackupScheduler, uploadLimits, verifyBackup,
 } from './src/backup.js';
 import { seedIfEmpty, ensureSeedImages } from './src/seed.js';
 import { seedDirectory } from './src/seed-directory.js';
@@ -1674,6 +1676,13 @@ export function createApp() {
       return null;
     }
   };
+  const safeChainFingerprint = () => {
+    try {
+      return chainFingerprint();
+    } catch {
+      return null;
+    }
+  };
   const backupRowFor = (db, made, saved, reason, createdBy) => ({
     id: id(),
     createdAt: made.header.createdAt,
@@ -1712,6 +1721,19 @@ export function createApp() {
       count: history.length,
       storage: 'data/backups',
       persistentDisk: false,
+      uploads: { ...uploadLimits(), storage: 'public/uploads', includedInBackup: true },
+      chain: {
+        hmac: 'sha256',
+        keySource: chainKeySource(),
+        fingerprint: safeChainFingerprint(),
+        signed: Number(history[0]?.chain?.signed) || 0,
+        legacy: Number(history[0]?.chain?.legacy) || 0,
+      },
+      durability: {
+        guaranteed: false,
+        method: 'download',
+        note: 'در پلن رایگان دیسک پایدار وجود ندارد؛ برای ماندگاری، فایل .sbbak را دانلود کنید و پس از Redeploy با «بازیابی از فایل» برگردانید.',
+      },
       limitation: 'در پلن رایگان دیسک پایدار وجود ندارد؛ فایل پشتیبان تا بازاستقرار بعدی روی همین نمونه می‌ماند. برای نگهداری بلندمدت، فایل را دانلود کنید.',
     });
   });
@@ -1729,6 +1751,13 @@ export function createApp() {
     } catch (err) {
       return backupError(res, err);
     }
+    // بررسی صحت و قابلیت بازیابی پیش از ارائهٔ فایل به مالک
+    let checked;
+    try {
+      checked = verifyBackup(made.buffer);
+    } catch (err) {
+      return backupError(res, err);
+    }
     const saved = saveBackupFile(made.buffer, made.filename);
     const row = backupRowFor(db, made, saved, made.header.reason, req.user.id);
     db.backupHistory = [...(Array.isArray(db.backupHistory) ? db.backupHistory : []), row].slice(-50);
@@ -1737,7 +1766,16 @@ export function createApp() {
       meta: { size: row.size, reason: row.reason }, ip: req.ip,
     });
     saveDbSoon();
-    res.status(201).json({ backup: backupView(row) });
+    res.status(201).json({
+      backup: backupView(row),
+      verification: {
+        ok: true,
+        chain: checked.chain,
+        counts: checked.counts,
+        uploads: checked.uploadsMeta,
+        environment: checked.environment,
+      },
+    });
   });
 
   app.get('/api/finance/backup/:id/download', requireOwner, financeLimiter, (req, res) => {
@@ -1746,9 +1784,11 @@ export function createApp() {
     if (!row) return res.status(404).json({ error: 'not_found' });
     try {
       const buffer = readBackupFile(row.file);
+      // فایل معیوب یا دست‌کاری‌شده هرگز تحویل داده نمی‌شود
+      const checked = verifyBackup(buffer);
       audit(db, {
         actorId: req.user.id, actorRole: req.user.role, action: 'backup_downloaded', target: row.id,
-        meta: { size: buffer.length }, ip: req.ip,
+        meta: { size: buffer.length, chainValid: checked.chain.valid, uploads: checked.uploads }, ip: req.ip,
       });
       saveDbSoon();
       res.setHeader('content-type', 'application/octet-stream');
@@ -1827,6 +1867,9 @@ export function createApp() {
     const historyBefore = Array.isArray(db.backupHistory) ? db.backupHistory.slice() : [];
     const next = restored.data;
     replaceDb(next);
+    // بازگرداندن تصاویر و کلید زنجیره تا پس از Redeploy هم همهٔ اطلاعات کامل باشد
+    const uploadsRestored = restoreUploads(restored.uploads);
+    const keysRestored = restored.chainKeyHex ? installKeys({ chainKeyHex: restored.chainKeyHex }) : null;
     const dbAfter = getDb();
     dbAfter.backupHistory = [...historyBefore, snapshot].slice(-50);
     audit(dbAfter, {
@@ -1841,7 +1884,10 @@ export function createApp() {
     return res.json({
       ok: true,
       mode: 'apply',
-      restored: { counts: restored.counts, chain: restored.chain, environment: restored.environment },
+      restored: {
+        counts: restored.counts, chain: restored.chain, environment: restored.environment,
+        uploads: uploadsRestored, keys: keysRestored,
+      },
       preRestoreBackup: snapshot.id,
     });
   });
@@ -1873,6 +1919,149 @@ export function createApp() {
     }
     res.status(201).json({ backup: backupView(row) });
   });
+
+  /* ---------- بازیابی از فایل دانلودشده (پس از Redeploy) ---------- */
+
+  const importBody = (req) => {
+    const raw = typeof req.body === 'string'
+      ? req.body
+      : Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
+    const text = raw.trim();
+    if (!text) throw new BackupError('backup_corrupt', 400);
+    if (text.length > 100 * 1024 * 1024) throw new BackupError('backup_too_large', 413);
+    return Buffer.from(text, 'base64');
+  };
+
+  app.post(
+    '/api/finance/backup/import',
+    requireOwner,
+    express.text({ type: ['text/plain', 'application/octet-stream'], limit: '100mb' }),
+    reportLimiter,
+    (req, res) => {
+      const db = getDb();
+      let parsed;
+      try {
+        parsed = readBackupForRestore(importBody(req));
+      } catch (err) {
+        return backupError(res, err);
+      }
+      if (String(req.query.mode || 'preview') !== 'apply') {
+        audit(db, {
+          actorId: req.user.id, actorRole: req.user.role, action: 'backup_import_preview', target: 'file',
+          meta: { entries: parsed.chain.entries }, ip: req.ip,
+        });
+        saveDbSoon();
+        return res.json({
+          ok: true,
+          mode: 'preview',
+          restored: {
+            counts: parsed.counts, chain: parsed.chain, environment: parsed.environment,
+            createdAt: parsed.header?.createdAt || null, uploads: parsed.uploadsMeta,
+          },
+        });
+      }
+      if (String(req.query.confirm || '') !== 'RESTORE') return res.status(400).json({ error: 'confirm_required' });
+      const second = verifySecondFactor({
+        body: { password: req.get('x-finance-password') || '', code: req.get('x-2fa-code') || '' },
+        user: req.user, path: req.path, ip: req.ip,
+      }, db);
+      if (!second.ok) return res.status(second.status).json({ error: second.error });
+      let snapshot = null;
+      try {
+        const made = createBackup(db, { reason: 'pre-restore' });
+        const saved = saveBackupFile(made.buffer, `pre-restore-${Date.now()}.sbbak`);
+        snapshot = backupRowFor(db, made, saved, 'pre-restore', req.user.id);
+      } catch (err) {
+        return backupError(res, err);
+      }
+      const historyBefore = Array.isArray(db.backupHistory) ? db.backupHistory.slice() : [];
+      replaceDb(parsed.data);
+      const uploadsRestored = restoreUploads(parsed.uploads);
+      const keysRestored = parsed.chainKeyHex ? installKeys({ chainKeyHex: parsed.chainKeyHex }) : null;
+      const dbAfter = getDb();
+      dbAfter.backupHistory = [...historyBefore, snapshot].slice(-50);
+      audit(dbAfter, {
+        actorId: req.user.id, actorRole: req.user.role, action: 'backup_imported', target: 'file',
+        meta: { preRestoreBackup: snapshot.id, entries: parsed.chain.entries, uploads: uploadsRestored.written },
+        ip: req.ip,
+      });
+      recordSecurityEvent({
+        type: 'backup_imported', severity: 'critical', ip: req.ip, identity: req.user.email,
+        path: '/api/finance/backup/import', detail: 'upload',
+      });
+      saveDb();
+      res.json({
+        ok: true,
+        mode: 'apply',
+        restored: {
+          counts: parsed.counts, chain: parsed.chain, environment: parsed.environment,
+          uploads: uploadsRestored, keys: keysRestored,
+        },
+        preRestoreBackup: snapshot.id,
+      });
+    },
+  );
+
+  /* ---------- کیت بازیابی کلیدها (پس از Redeploy) ---------- */
+
+  app.post('/api/finance/backup/recovery-kit', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const second = verifySecondFactor(req, db);
+    if (!second.ok) return res.status(second.status).json({ error: second.error });
+    let kit;
+    try {
+      kit = createRecoveryKit(String(req.body?.passphrase || ''));
+    } catch (err) {
+      return backupError(res, err);
+    }
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'recovery_kit_created', target: 'keys',
+      meta: { size: kit.size }, ip: req.ip,
+    });
+    recordSecurityEvent({
+      type: 'recovery_kit_created', severity: 'critical', ip: req.ip, identity: req.user.email,
+      path: '/api/finance/backup/recovery-kit', detail: 'keys',
+    });
+    saveDbSoon();
+    res.setHeader('content-type', 'application/octet-stream');
+    res.setHeader('content-disposition', `attachment; filename="${kit.filename}"`);
+    res.send(kit.buffer);
+  });
+
+  app.post(
+    '/api/finance/backup/recovery-kit/install',
+    requireOwner,
+    express.text({ type: ['text/plain', 'application/octet-stream'], limit: '256kb' }),
+    reportLimiter,
+    (req, res) => {
+      const db = getDb();
+      const second = verifySecondFactor({
+        body: { password: req.get('x-finance-password') || '', code: req.get('x-2fa-code') || '' },
+        user: req.user, path: req.path, ip: req.ip,
+      }, db);
+      if (!second.ok) return res.status(second.status).json({ error: second.error });
+      let kit;
+      try {
+        kit = readRecoveryKit(
+          typeof req.body === 'string' ? req.body : Buffer.isBuffer(req.body) ? req.body : '',
+          req.get('x-kit-passphrase') || '',
+        );
+      } catch (err) {
+        return backupError(res, err);
+      }
+      const installed = installKeys({ backupKeyHex: kit.backupKeyHex, chainKeyHex: kit.chainKeyHex });
+      audit(db, {
+        actorId: req.user.id, actorRole: req.user.role, action: 'recovery_kit_installed', target: 'keys',
+        meta: { fingerprint: installed.fingerprint }, ip: req.ip,
+      });
+      recordSecurityEvent({
+        type: 'recovery_kit_installed', severity: 'critical', ip: req.ip, identity: req.user.email,
+        path: '/api/finance/backup/recovery-kit/install', detail: 'keys',
+      });
+      saveDbSoon();
+      res.json({ ok: true, keys: installed });
+    },
+  );
 
   /* ================= فاز چهارم: نشست‌ها و کدهای بازیابی ================= */
 
