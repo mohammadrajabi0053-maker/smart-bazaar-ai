@@ -615,11 +615,14 @@ function bindUi() {
 async function boot() {
   applyDir();
   localize();
-  try { state.meta = await meta(); } catch { state.meta = null; }
+  // شنونده‌ها پیش از هر درخواست شبکه بسته می‌شوند تا کلیک‌های زودهنگام کاربر از دست نروند
   bindUi();
   renderChips();
   renderDemoAccounts();
+  try { state.meta = await meta(); } catch { state.meta = null; }
   $('#aiEngine').textContent = state.meta?.ai?.engine || 'local';
+  renderChips();
+  renderDemoAccounts();
   await loadMe();
   await loadProducts(true);
 }
