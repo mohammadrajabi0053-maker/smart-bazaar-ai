@@ -1714,6 +1714,672 @@ export function createApp() {
     res.json({ ok: true, copies: grant.copies, prints: grant.prints });
   });
 
+  /* ----------------------- فاز سوم: احراز هویت تلفنی ----------------------- */
+
+  const otpLimiter = createLimiter({ windowMs: 60000, max: 15 });
+  const directoryLimiter = createLimiter({ windowMs: 60000, max: 150 });
+  const directoryRoles = ['admin', 'agent'];
+  const canSeeContacts = (user) => Boolean(user) && (user.role === 'admin' || user.contactAccess === true);
+  const requireDirectory = (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'auth_required' });
+    if (!directoryRoles.includes(req.user.role)) return res.status(403).json({ error: 'forbidden' });
+    return next();
+  };
+  const requireAdminOnly = (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'auth_required' });
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'forbidden' });
+    return next();
+  };
+  const actorOf = (req) => ({ id: req.user?.id || null, role: req.user?.role || 'public', name: req.user?.name || '' });
+  const uniqueStoreSlug = (db, base) => {
+    const root = String(base || 'store').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || 'store';
+    let slug = root;
+    let n = 1;
+    while (db.users.some((u) => u.storeSlug === slug)) slug = `${root}-${n++}`;
+    return slug;
+  };
+
+  app.post('/api/auth/phone/request', otpLimiter, (req, res) => {
+    const db = getDb();
+    const mode = req.body?.mode === 'register' ? 'register' : 'login';
+    const phone = normalizePhone(req.body?.phone);
+    if (!phone) return res.status(400).json({ error: 'phone_invalid' });
+    const existing = db.users.find((u) => phoneKey(u.phone) === phoneKey(phone));
+    if (mode === 'login' && !existing) return res.status(404).json({ error: 'account_not_found' });
+    if (mode === 'register' && existing) return res.status(409).json({ error: 'phone_already_registered' });
+
+    const payload = {};
+    if (mode === 'register') {
+      const role = req.body?.role === 'seller' ? 'seller' : 'customer';
+      const name = clean(req.body?.name, 80);
+      const storeName = clean(req.body?.storeName, 80);
+      if (name.length < 3) return res.status(400).json({ error: 'name_required' });
+      if (role === 'seller' && storeName.length < 2) return res.status(400).json({ error: 'store_name_required' });
+      Object.assign(payload, {
+        role,
+        name,
+        storeName,
+        industry: isIndustry(req.body?.industry) ? req.body.industry : 'other',
+        city: clean(req.body?.city, 60),
+      });
+    }
+
+    const result = requestOtp(db, { phone, purpose: mode, payload, ip: req.ip });
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    logAudit(db, { actor: actorOf(req), action: `otp_${mode}_request`, target: maskPhone(phone), ip: req.ip });
+    saveDbSoon();
+    res.json({
+      ok: true,
+      phone: result.phone,
+      delivery: result.delivery,
+      expiresAt: result.expiresAt,
+      previewCode: result.previewCode,
+      note: result.note,
+    });
+  });
+
+  app.post('/api/auth/phone/verify', otpLimiter, (req, res) => {
+    const db = getDb();
+    const mode = req.body?.mode === 'register' ? 'register' : 'login';
+    const phone = normalizePhone(req.body?.phone);
+    if (!phone) return res.status(400).json({ error: 'phone_invalid' });
+
+    const result = verifyOtp(db, { phone, code: req.body?.code, purpose: mode });
+    if (!result.ok) {
+      logAudit(db, { actor: actorOf(req), action: 'otp_verify_failed', target: maskPhone(phone), meta: { error: result.error }, ip: req.ip });
+      saveDbSoon();
+      return res.status(result.status).json({ error: result.error, attemptsLeft: result.attemptsLeft });
+    }
+
+    let user = db.users.find((u) => phoneKey(u.phone) === phoneKey(phone));
+    if (mode === 'register') {
+      if (user) return res.status(409).json({ error: 'phone_already_registered' });
+      const payload = result.challenge.payload || {};
+      const isSeller = payload.role === 'seller';
+      user = {
+        id: id(),
+        name: payload.name || 'کاربر',
+        email: null,
+        passwordHash: null,
+        role: isSeller ? 'seller' : 'customer',
+        storeName: isSeller ? payload.storeName : null,
+        storeSlug: isSeller ? uniqueStoreSlug(db, payload.storeName || payload.name) : null,
+        phone,
+        phoneVerified: true,
+        phoneVerifiedAt: new Date().toISOString(),
+        status: 'active',
+        city: payload.city || '',
+        profile: isSeller
+          ? {
+            industry: payload.industry || 'other', country: 'IR', province: '', city: payload.city || '',
+            address: '', whatsapp: null, telegram: null, instagram: null, website: null,
+          }
+          : null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.users.push(user);
+      logAudit(db, { actor: { id: user.id, role: user.role, name: user.name }, action: 'phone_register', target: user.id, meta: { role: user.role }, ip: req.ip });
+    } else {
+      if (!user) return res.status(404).json({ error: 'account_not_found' });
+      user.phoneVerified = true;
+      user.phoneVerifiedAt = user.phoneVerifiedAt || new Date().toISOString();
+      user.lastLoginAt = new Date().toISOString();
+      logAudit(db, { actor: { id: user.id, role: user.role, name: user.name }, action: 'phone_login', target: user.id, ip: req.ip });
+    }
+
+    if (user.status === 'blocked') return res.status(403).json({ error: 'account_blocked' });
+    setSessionCookie(res, user);
+    saveDbSoon();
+    res.json({ user: publicUser(user), phoneVerified: true });
+  });
+
+  /* -------------------- پروفایل فروشنده و پنل مشتری -------------------- */
+
+  app.get('/api/seller/profile', requireRole('seller'), (req, res) => {
+    res.json({
+      profile: {
+        businessName: req.user.storeName || '',
+        phone: req.user.phone || '',
+        ...(req.user.profile || {}),
+      },
+    });
+  });
+
+  app.put('/api/seller/profile', requireRole('seller'), (req, res) => {
+    const body = req.body || {};
+    const errors = [];
+    const businessName = clean(body.businessName, 80);
+    if (businessName.length < 2) errors.push('store_name_required');
+    if (!isIndustry(body.industry)) errors.push('industry_invalid');
+    const country = String(body.country || 'IR').toUpperCase();
+    if (!isCountry(country)) errors.push('country_invalid');
+    const city = clean(body.city, 60);
+    if (city.length < 2) errors.push('city_required');
+    const website = clean(body.website, 200);
+    if (website && !/^https?:\/\/[^\s]+$/i.test(website)) errors.push('website_invalid');
+    if (errors.length) return res.status(400).json({ error: errors[0], errors });
+
+    req.user.storeName = businessName;
+    req.user.profile = {
+      ...(req.user.profile || {}),
+      industry: body.industry,
+      country,
+      province: clean(body.province, 60),
+      city,
+      address: cleanMultiline(body.address, 300),
+      whatsapp: normalizePhone(body.whatsapp) || null,
+      telegram: clean(body.telegram, 120) || null,
+      instagram: clean(body.instagram, 120) || null,
+      website: website || null,
+      updatedAt: new Date().toISOString(),
+    };
+    req.user.updatedAt = new Date().toISOString();
+    logAudit(getDb(), { actor: actorOf(req), action: 'seller_profile_update', target: req.user.id, ip: req.ip });
+    saveDbSoon();
+    res.json({ profile: { businessName: req.user.storeName, phone: req.user.phone, ...req.user.profile } });
+  });
+
+  app.get('/api/account/summary', requireAuth, (req, res) => {
+    const db = getDb();
+    const orders = db.orders.filter((o) => o.customerId === req.user.id);
+    const paid = orders.filter((o) => o.status !== 'canceled' && o.status !== 'returned');
+    res.json({
+      user: { ...publicUser(req.user), phoneVerified: Boolean(req.user.phoneVerified), city: req.user.city || '' },
+      stats: {
+        orders: orders.length,
+        open: orders.filter((o) => !['delivered', 'canceled', 'returned'].includes(o.status)).length,
+        spent: paid.reduce((s, o) => s + Number(o.total || 0), 0),
+      },
+      recentOrders: orders
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .slice(0, 5)
+        .map(orderView),
+    });
+  });
+
+  app.patch('/api/account/profile', requireAuth, (req, res) => {
+    const body = req.body || {};
+    const name = clean(body.name, 80);
+    if (name.length < 3) return res.status(400).json({ error: 'name_required' });
+    if (body.phone && phoneKey(body.phone) !== phoneKey(req.user.phone)) {
+      return res.status(400).json({ error: 'phone_change_requires_verification' });
+    }
+    req.user.name = name;
+    req.user.city = clean(body.city, 60);
+    req.user.address = cleanMultiline(body.address, 300);
+    req.user.updatedAt = new Date().toISOString();
+    saveDbSoon();
+    res.json({ user: publicUser(req.user) });
+  });
+
+  /* ------------------- بانک اصناف، متقاضیان تبلیغات و CRM ------------------- */
+
+  app.get('/api/directory/catalog', directoryLimiter, (_req, res) => {
+    res.json(catalogPayload());
+  });
+
+  app.get('/api/directory/businesses', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const rows = filterBusinesses(db, req.query || {});
+    const reveal = canSeeContacts(req.user);
+    const limit = Math.min(200, Math.max(1, Number(req.query?.limit) || 60));
+    const list = rows.slice(0, limit).map((row) => businessView(row, { canSeeContacts: reveal }));
+    if (reveal && list.length) {
+      logAudit(db, { actor: actorOf(req), action: 'contacts_reveal', target: 'businesses', meta: { count: list.length }, ip: req.ip });
+      saveDbSoon();
+    }
+    res.json({ businesses: list, total: rows.length, canSeeContacts: reveal, stats: directoryStats(db) });
+  });
+
+  app.post('/api/directory/businesses', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const { errors, value } = normalizeBusinessInput(req.body || {});
+    if (errors.length) return res.status(400).json({ error: errors[0], errors });
+    const duplicate = findDuplicate(db, value);
+    if (duplicate) {
+      return res.status(409).json({ error: 'duplicate_business', duplicateOf: { id: duplicate.id, name: duplicate.name, city: duplicate.city } });
+    }
+    const consentStatus = CONSENT_STATUSES.includes(req.body?.consent?.status) ? req.body.consent.status : 'pending';
+    const row = {
+      id: id(),
+      ...value,
+      verifiedStatus: 'unverified',
+      lastCheckedAt: new Date().toISOString(),
+      consent: {
+        status: consentStatus,
+        at: new Date().toISOString(),
+        source: value.sourceType,
+        note: clean(req.body?.consent?.note, 200),
+        revokedAt: null,
+      },
+      consentHistory: [],
+      adLicense: consentStatus === 'granted',
+      assignedTo: req.user.id,
+      assignedName: req.user.name,
+      dataset: 'live',
+      createdBy: req.user.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    db.businesses.push(row);
+    logAudit(db, { actor: actorOf(req), action: 'business_create', target: row.id, meta: { name: row.name }, ip: req.ip });
+    saveDbSoon();
+    res.status(201).json({ business: businessView(row, { canSeeContacts: canSeeContacts(req.user) }) });
+  });
+
+  app.get('/api/directory/businesses/export.csv', requireAdminOnly, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const rows = filterBusinesses(db, req.query || {});
+    logAudit(db, { actor: actorOf(req), action: 'directory_export', target: 'businesses', meta: { count: rows.length }, ip: req.ip });
+    saveDbSoon();
+    res.type('text/csv; charset=utf-8').send(csvForBusinesses(db, rows));
+  });
+
+  app.get('/api/directory/businesses/:id', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const row = db.businesses.find((b) => b.id === req.params.id && !b.deletedAt);
+    if (!row) return res.status(404).json({ error: 'business_not_found' });
+    const reveal = canSeeContacts(req.user);
+    if (reveal) {
+      logAudit(db, { actor: actorOf(req), action: 'business_view_contacts', target: row.id, ip: req.ip });
+      saveDbSoon();
+    }
+    res.json({ business: businessView(row, { canSeeContacts: reveal }) });
+  });
+
+  app.put('/api/directory/businesses/:id', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const row = db.businesses.find((b) => b.id === req.params.id && !b.deletedAt);
+    if (!row) return res.status(404).json({ error: 'business_not_found' });
+    const { errors, value } = normalizeBusinessInput(req.body || {});
+    if (errors.length) return res.status(400).json({ error: errors[0], errors });
+    const duplicate = findDuplicate(db, value, row.id);
+    if (duplicate) {
+      return res.status(409).json({ error: 'duplicate_business', duplicateOf: { id: duplicate.id, name: duplicate.name, city: duplicate.city } });
+    }
+    Object.assign(row, value, { updatedAt: new Date().toISOString(), lastCheckedAt: new Date().toISOString() });
+    if (VERIFY_STATUSES.includes(req.body?.verifiedStatus)) row.verifiedStatus = req.body.verifiedStatus;
+    if (req.body?.adLicense !== undefined) row.adLicense = Boolean(req.body.adLicense) && consentView(row.consent).status === 'granted';
+    logAudit(db, { actor: actorOf(req), action: 'business_update', target: row.id, ip: req.ip });
+    saveDbSoon();
+    res.json({ business: businessView(row, { canSeeContacts: canSeeContacts(req.user) }) });
+  });
+
+  app.post('/api/directory/businesses/:id/consent', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const row = db.businesses.find((b) => b.id === req.params.id && !b.deletedAt);
+    if (!row) return res.status(404).json({ error: 'business_not_found' });
+    try {
+      setConsent(row, { status: String(req.body?.status || ''), source: req.body?.source, note: req.body?.note }, actorOf(req));
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.code || 'consent_invalid' });
+    }
+    if (req.body?.status === 'granted' && req.body?.adLicense === true) row.adLicense = true;
+    logAudit(db, { actor: actorOf(req), action: `consent_${row.consent.status}`, target: row.id, ip: req.ip });
+    saveDbSoon();
+    res.json({ business: businessView(row, { canSeeContacts: canSeeContacts(req.user) }) });
+  });
+
+  app.post('/api/directory/businesses/:id/assign', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const row = db.businesses.find((b) => b.id === req.params.id && !b.deletedAt);
+    if (!row) return res.status(404).json({ error: 'business_not_found' });
+    const target = db.users.find((u) => u.id === clean(req.body?.userId, 40));
+    if (!target || !directoryRoles.includes(target.role)) return res.status(400).json({ error: 'assignee_invalid' });
+    row.assignedTo = target.id;
+    row.assignedName = target.name;
+    row.updatedAt = new Date().toISOString();
+    logAudit(db, { actor: actorOf(req), action: 'business_assign', target: row.id, meta: { to: target.id }, ip: req.ip });
+    saveDbSoon();
+    res.json({ business: businessView(row, { canSeeContacts: canSeeContacts(req.user) }) });
+  });
+
+  app.delete('/api/directory/businesses/:id', requireAdminOnly, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const row = db.businesses.find((b) => b.id === req.params.id && !b.deletedAt);
+    if (!row) return res.status(404).json({ error: 'business_not_found' });
+    row.deletedAt = new Date().toISOString();
+    row.deletedBy = req.user.id;
+    setConsent(row, { status: 'revoked', source: 'admin_removal', note: 'حذف توسط مدیر' }, actorOf(req));
+    logAudit(db, { actor: actorOf(req), action: 'business_delete', target: row.id, ip: req.ip });
+    saveDbSoon();
+    res.json({ ok: true });
+  });
+
+  app.get('/api/directory/leads', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const rows = filterLeads(db, req.query || {});
+    const reveal = canSeeContacts(req.user);
+    const limit = Math.min(200, Math.max(1, Number(req.query?.limit) || 60));
+    res.json({
+      leads: rows.slice(0, limit).map((row) => leadView(row, { canSeeContacts: reveal })),
+      total: rows.length,
+      canSeeContacts: reveal,
+    });
+  });
+
+  app.post('/api/directory/leads', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const { errors, value } = normalizeLeadInput(req.body || {});
+    if (errors.length) return res.status(400).json({ error: errors[0], errors });
+    const duplicate = findLeadDuplicate(db, value);
+    if (duplicate) {
+      return res.status(409).json({ error: 'duplicate_lead', duplicateOf: { id: duplicate.id, name: duplicate.name } });
+    }
+    const consentStatus = CONSENT_STATUSES.includes(req.body?.consent?.status) ? req.body.consent.status : 'pending';
+    const row = {
+      id: id(),
+      ...value,
+      status: LEAD_STATUSES.includes(req.body?.status) ? req.body.status : 'new',
+      consent: { status: consentStatus, at: new Date().toISOString(), source: 'self_registration', note: clean(req.body?.consent?.note, 200), revokedAt: null },
+      consentHistory: [],
+      adLicense: consentStatus === 'granted',
+      assignedTo: req.user.id,
+      assignedName: req.user.name,
+      dataset: 'live',
+      convertedUserId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    db.adLeads.push(row);
+    logAudit(db, { actor: actorOf(req), action: 'lead_create', target: row.id, meta: { business: row.businessName }, ip: req.ip });
+    saveDbSoon();
+    res.status(201).json({ lead: leadView(row, { canSeeContacts: canSeeContacts(req.user) }) });
+  });
+
+  app.put('/api/directory/leads/:id', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const row = db.adLeads.find((l) => l.id === req.params.id && !l.deletedAt);
+    if (!row) return res.status(404).json({ error: 'lead_not_found' });
+    const { errors, value } = normalizeLeadInput({ ...row, ...req.body });
+    if (errors.length) return res.status(400).json({ error: errors[0], errors });
+    Object.assign(row, value, { updatedAt: new Date().toISOString() });
+    if (LEAD_STATUSES.includes(req.body?.status)) row.status = req.body.status;
+    logAudit(db, { actor: actorOf(req), action: 'lead_update', target: row.id, ip: req.ip });
+    saveDbSoon();
+    res.json({ lead: leadView(row, { canSeeContacts: canSeeContacts(req.user) }) });
+  });
+
+  app.post('/api/directory/leads/:id/status', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const row = db.adLeads.find((l) => l.id === req.params.id && !l.deletedAt);
+    if (!row) return res.status(404).json({ error: 'lead_not_found' });
+    const status = String(req.body?.status || '');
+    if (!LEAD_STATUSES.includes(status)) return res.status(400).json({ error: 'status_invalid' });
+    row.status = status;
+    row.updatedAt = new Date().toISOString();
+    logAudit(db, { actor: actorOf(req), action: `lead_${status}`, target: row.id, ip: req.ip });
+    saveDbSoon();
+    res.json({ lead: leadView(row, { canSeeContacts: canSeeContacts(req.user) }) });
+  });
+
+  app.post('/api/directory/leads/:id/convert', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const row = db.adLeads.find((l) => l.id === req.params.id && !l.deletedAt);
+    if (!row) return res.status(404).json({ error: 'lead_not_found' });
+    if (row.status === 'converted' && row.convertedUserId) {
+      return res.json({ lead: leadView(row, { canSeeContacts: canSeeContacts(req.user) }), user: publicUser(db.users.find((u) => u.id === row.convertedUserId)) });
+    }
+    let user = db.users.find((u) => phoneKey(u.phone) === phoneKey(row.phone));
+    if (!user) {
+      user = {
+        id: id(), name: row.name, email: null, passwordHash: null, role: 'customer',
+        storeName: row.businessName, storeSlug: null, phone: row.phone, phoneVerified: false,
+        status: 'active', city: row.city || '', profile: null,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      db.users.push(user);
+    }
+    row.status = 'converted';
+    row.convertedUserId = user.id;
+    row.convertedAt = new Date().toISOString();
+    row.updatedAt = row.convertedAt;
+    addActivity(db, {
+      entityType: 'lead', entityId: row.id, type: 'note',
+      summary: `تبدیل متقاضی به مشتری (${user.name})`, outcome: 'converted', actor: actorOf(req),
+    });
+    logAudit(db, { actor: actorOf(req), action: 'lead_convert', target: row.id, meta: { userId: user.id }, ip: req.ip });
+    saveDbSoon();
+    res.json({ lead: leadView(row, { canSeeContacts: canSeeContacts(req.user) }), user: publicUser(user) });
+  });
+
+  app.get('/api/directory/activities', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const entityType = clean(req.query?.entityType, 20);
+    const entityId = clean(req.query?.entityId, 40);
+    const rows = (db.crmActivities || [])
+      .filter((a) => (entityType ? a.entityType === entityType : true))
+      .filter((a) => (entityId ? a.entityId === entityId : true))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, 100)
+      .map(activityView);
+    res.json({ activities: rows });
+  });
+
+  app.post('/api/directory/activities', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    try {
+      const activity = addActivity(db, {
+        entityType: String(req.body?.entityType || ''),
+        entityId: clean(req.body?.entityId, 40),
+        type: String(req.body?.type || ''),
+        summary: req.body?.summary,
+        outcome: req.body?.outcome,
+        nextCallAt: req.body?.nextCallAt || null,
+        actor: actorOf(req),
+      });
+      logAudit(db, { actor: actorOf(req), action: 'crm_activity', target: `${activity.entityType}:${activity.entityId}`, ip: req.ip });
+      saveDbSoon();
+      res.status(201).json({ activity: activityView(activity) });
+    } catch (err) {
+      const status = err instanceof DirectoryError ? err.status : 400;
+      return res.status(status).json({ error: err.code || 'activity_invalid' });
+    }
+  });
+
+  app.post('/api/directory/activities/:id/done', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    try {
+      const activity = completeActivity(db, req.params.id, actorOf(req));
+      logAudit(db, { actor: actorOf(req), action: 'crm_activity_done', target: activity.id, ip: req.ip });
+      saveDbSoon();
+      res.json({ activity: activityView(activity) });
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.code || 'activity_not_found' });
+    }
+  });
+
+  app.get('/api/directory/reminders', requireDirectory, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const withinHours = Math.min(720, Math.max(1, Number(req.query?.withinHours) || 48));
+    const mine = req.query?.mine === '1';
+    res.json({ reminders: dueReminders(db, { withinHours, actorId: mine ? req.user.id : null }) });
+  });
+
+  app.get('/api/directory/stats', requireDirectory, directoryLimiter, (_req, res) => {
+    const db = getDb();
+    res.json({
+      directory: directoryStats(db),
+      crm: crmStats(db),
+      datasets: {
+        demo: {
+          businesses: db.businesses.filter((b) => (b.dataset || 'live') === 'demo').length,
+          leads: db.adLeads.filter((l) => (l.dataset || 'live') === 'demo').length,
+        },
+        live: {
+          businesses: db.businesses.filter((b) => (b.dataset || 'live') === 'live').length,
+          leads: db.adLeads.filter((l) => (l.dataset || 'live') === 'live').length,
+        },
+      },
+    });
+  });
+
+  app.get('/api/directory/audit', requireAdminOnly, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const limit = Math.min(500, Math.max(1, Number(req.query?.limit) || 100));
+    const rows = [...(db.auditLog || [])].reverse().slice(0, limit);
+    res.json({ entries: rows });
+  });
+
+  app.get('/api/directory/team', requireAdminOnly, directoryLimiter, (_req, res) => {
+    const db = getDb();
+    const users = db.users
+      .filter((u) => directoryRoles.includes(u.role))
+      .map((u) => ({
+        id: u.id, name: u.name, role: u.role, phone: maskPhone(u.phone),
+        contactAccess: Boolean(u.contactAccess), status: u.status, createdAt: u.createdAt,
+      }));
+    res.json({ users });
+  });
+
+  app.post('/api/directory/team', requireAdminOnly, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const phone = normalizePhone(req.body?.phone);
+    if (!phone) return res.status(400).json({ error: 'phone_invalid' });
+    const user = db.users.find((u) => phoneKey(u.phone) === phoneKey(phone));
+    if (!user) return res.status(404).json({ error: 'user_not_found' });
+    if (user.role === 'admin') return res.status(400).json({ error: 'admin_protected' });
+    user.role = 'agent';
+    user.contactAccess = Boolean(req.body?.contactAccess);
+    user.updatedAt = new Date().toISOString();
+    logAudit(db, { actor: actorOf(req), action: 'team_promote', target: user.id, meta: { contactAccess: user.contactAccess }, ip: req.ip });
+    saveDbSoon();
+    res.json({ user: { id: user.id, name: user.name, role: user.role, contactAccess: user.contactAccess } });
+  });
+
+  app.patch('/api/directory/team/:id', requireAdminOnly, directoryLimiter, (req, res) => {
+    const db = getDb();
+    const user = db.users.find((u) => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: 'user_not_found' });
+    if (user.role === 'admin') return res.status(400).json({ error: 'admin_protected' });
+    if (req.body?.contactAccess !== undefined) user.contactAccess = Boolean(req.body.contactAccess);
+    if (req.body?.revoke === true) {
+      user.role = 'customer';
+      user.contactAccess = false;
+    }
+    user.updatedAt = new Date().toISOString();
+    logAudit(db, { actor: actorOf(req), action: 'team_update', target: user.id, meta: { contactAccess: Boolean(user.contactAccess) }, ip: req.ip });
+    saveDbSoon();
+    res.json({ user: { id: user.id, name: user.name, role: user.role, contactAccess: Boolean(user.contactAccess) } });
+  });
+
+  /* -------------------- حریم خصوصی: لغو رضایت و حذف داده -------------------- */
+
+  app.post('/api/privacy/opt-out', otpLimiter, (req, res) => {
+    const db = getDb();
+    try {
+      const { record, affected } = recordOptOut(db, {
+        phone: req.body?.phone,
+        channel: ['all', 'sms', 'whatsapp', 'telegram', 'instagram', 'call'].includes(String(req.body?.channel)) ? String(req.body.channel) : 'all',
+        reason: req.body?.reason,
+        source: 'public_form',
+      });
+      logAudit(db, { actor: actorOf(req), action: 'privacy_opt_out', target: maskPhone(record.phone), meta: { affected }, ip: req.ip });
+      saveDbSoon();
+      res.json({ ok: true, affected, at: record.at });
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.code || 'phone_invalid' });
+    }
+  });
+
+  app.post('/api/privacy/deletion-request', otpLimiter, (req, res) => {
+    const db = getDb();
+    try {
+      const record = requestDeletion(db, {
+        entityType: req.body?.entityType === 'lead' ? 'lead' : 'business',
+        entityId: clean(req.body?.entityId, 40),
+        phone: req.body?.phone,
+        reason: req.body?.reason,
+        actor: actorOf(req),
+      });
+      logAudit(db, { actor: actorOf(req), action: 'privacy_deletion_request', target: record.entityId, ip: req.ip });
+      saveDbSoon();
+      res.status(201).json({ request: { id: record.id, status: record.status, createdAt: record.createdAt } });
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.code || 'request_invalid' });
+    }
+  });
+
+  app.get('/api/directory/deletion-requests', requireAdminOnly, directoryLimiter, (_req, res) => {
+    const db = getDb();
+    res.json({ requests: [...(db.deletionRequests || [])].reverse() });
+  });
+
+  app.post('/api/directory/deletion-requests/:id/apply', requireAdminOnly, directoryLimiter, (req, res) => {
+    const db = getDb();
+    try {
+      const record = applyDeletion(db, req.params.id, actorOf(req));
+      logAudit(db, { actor: actorOf(req), action: 'privacy_deletion_applied', target: record.entityId, ip: req.ip });
+      saveDbSoon();
+      res.json({ request: record });
+    } catch (err) {
+      return res.status(err.status || 400).json({ error: err.code || 'request_not_found' });
+    }
+  });
+
+  // فرم عمومی درخواست تبلیغ (ثبت متقاضی از سایت)
+  app.post('/api/public/ad-request', otpLimiter, (req, res) => {
+    const db = getDb();
+    const { errors, value } = normalizeLeadInput({ ...req.body, networks: req.body?.networks, budgetUsd: req.body?.budgetUsd, durationDays: req.body?.durationDays });
+    if (errors.length) return res.status(400).json({ error: errors[0], errors });
+    if (req.body?.consent !== true) return res.status(400).json({ error: 'advertising_consent_required' });
+    const duplicate = findLeadDuplicate(db, value);
+    if (duplicate) return res.status(409).json({ error: 'duplicate_lead', duplicateOf: { id: duplicate.id } });
+    const row = {
+      id: id(),
+      ...value,
+      status: 'new',
+      consent: { status: 'granted', at: new Date().toISOString(), source: 'self_registration', note: 'فرم عمومی درخواست تبلیغ', revokedAt: null },
+      consentHistory: [],
+      adLicense: true,
+      assignedTo: null,
+      assignedName: null,
+      dataset: 'live',
+      convertedUserId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    db.adLeads.push(row);
+    logAudit(db, { actor: { id: null, role: 'public', name: 'form' }, action: 'lead_public_request', target: row.id, ip: req.ip });
+    saveDbSoon();
+    res.status(201).json({ ok: true, id: row.id });
+  });
+
+  /* ----------------------- پرداخت آزمایشی و پیگیری ارسال ----------------------- */
+
+  app.post('/api/orders/:id/pay-test', requireAuth, (req, res) => {
+    const db = getDb();
+    const order = db.orders.find((o) => o.id === req.params.id);
+    if (!order) return res.status(404).json({ error: 'order_not_found' });
+    if (order.customerId !== req.user.id) return res.status(403).json({ error: 'forbidden' });
+    if (order.payment?.status === 'paid') return res.json({ order: orderView(order), duplicate: true });
+    if (['canceled', 'returned'].includes(order.status)) return res.status(409).json({ error: 'order_not_payable' });
+    order.payment = { method: 'test', status: 'paid', at: new Date().toISOString(), reference: `TEST-${id().slice(0, 8).toUpperCase()}` };
+    order.updatedAt = new Date().toISOString();
+    order.history = [...(order.history || []), { status: order.status, at: order.updatedAt, by: req.user.name, note: 'پرداخت آزمایشی' }];
+    logAudit(db, { actor: actorOf(req), action: 'order_test_payment', target: order.id, meta: { total: order.total }, ip: req.ip });
+    saveDbSoon();
+    res.json({ order: orderView(order) });
+  });
+
+  app.patch('/api/seller/orders/:id/tracking', requireRole('seller'), (req, res) => {
+    const db = getDb();
+    const order = db.orders.find((o) => o.id === req.params.id && o.sellerId === req.user.id);
+    if (!order) return res.status(404).json({ error: 'order_not_found' });
+    if (!['shipped', 'delivered'].includes(order.status)) return res.status(409).json({ error: 'order_not_shippable' });
+    const carrier = clean(req.body?.carrier, 60);
+    const trackingNumber = clean(req.body?.trackingNumber, 60);
+    const trackingUrl = clean(req.body?.trackingUrl, 300);
+    if (!carrier || !trackingNumber) return res.status(400).json({ error: 'tracking_required' });
+    if (trackingUrl && !/^https?:\/\/[^\s]+$/i.test(trackingUrl)) return res.status(400).json({ error: 'tracking_url_invalid' });
+    order.tracking = { carrier, trackingNumber, trackingUrl: trackingUrl || null, at: new Date().toISOString() };
+    order.updatedAt = new Date().toISOString();
+    logAudit(db, { actor: actorOf(req), action: 'order_tracking', target: order.id, ip: req.ip });
+    saveDbSoon();
+    res.json({ order: internalOrderView(order) });
+  });
+
   /* --------------------------------- فایل‌ها --------------------------------- */
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
@@ -1722,6 +2388,13 @@ export function createApp() {
   app.use(['/finance', '/finance.html', '/js/finance.js', '/css/finance.css'], (req, res, next) => {
     if (!req.user) return res.redirect('/?next=/finance');
     if (!isOwner(getDb(), req.user)) return res.status(403).type('html').send(deniedHtml);
+    return next();
+  });
+
+  // گارد پنل مدیریتی اصناف: دسترسی فقط برای مدیر و کارشناس مجاز
+  app.use(['/business', '/business.html', '/js/business.js', '/css/business.css'], (req, res, next) => {
+    if (!req.user) return res.redirect('/login?next=/business');
+    if (!directoryRoles.includes(req.user.role)) return res.status(403).type('html').send(deniedHtml);
     return next();
   });
 
@@ -1735,6 +2408,14 @@ export function createApp() {
     return res.sendFile(path.join(PUBLIC_DIR, 'finance.html'));
   });
   app.get('/report/:token', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'report.html')));
+  app.get('/login', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'login.html')));
+  app.get('/account', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'account.html')));
+  app.get('/privacy', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'privacy.html')));
+  app.get('/business', (req, res) => {
+    if (!req.user) return res.redirect('/login?next=/business');
+    if (!directoryRoles.includes(req.user.role)) return res.status(403).type('html').send(deniedHtml);
+    return res.sendFile(path.join(PUBLIC_DIR, 'business.html'));
+  });
 
   app.use((req, res) => {
     if (req.accepts('html')) return res.status(404).sendFile(path.join(PUBLIC_DIR, '404.html'));
