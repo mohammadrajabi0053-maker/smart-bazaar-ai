@@ -91,6 +91,12 @@ async function loadBackup() {
     const data = await api('/api/finance/backup/status');
     $('backupEncryption').textContent = `الگوریتم ${data.encryption.algorithm} • KDF ${data.encryption.kdf} • منبع کلید: ${data.encryption.keySource} • مستقل از SESSION_SECRET: ${data.encryption.keyIndependentFromSession ? 'بله' : 'خیر'}`;
     $('backupLimit').textContent = data.limitation;
+    const coverage = $('backupCoverage');
+    if (coverage) {
+      const uploads = data.uploads || {};
+      const chain = data.chain || {};
+      coverage.textContent = `تصاویر: ${uploads.count ?? 0} فایل • حجم ${bytes(uploads.bytes)} • حداکثر هر فایل ${bytes(uploads.maxFileBytes)} • داخل پشتیبان: ${uploads.includedInBackup ? 'بله' : 'خیر'} — زنجیرهٔ مالی: HMAC ${chain.hmac || '—'} (${chain.signed ?? 0} امضاشده، ${chain.legacy ?? 0} قدیمی) • منبع کلید: ${chain.keySource || '—'}`;
+    }
     $('schedEnabled').checked = Boolean(data.schedule.enabled);
     $('schedInterval').value = data.schedule.intervalHours;
     $('schedRetention').value = data.schedule.retention;
@@ -202,6 +208,128 @@ async function runBackupNow() {
     await loadBackup();
   } catch (err) {
     toast(`اجرای پشتیبان ناموفق: ${err.message}`, 'err');
+  }
+}
+
+/* ------------------- بازیابی از فایل دانلودشده (Redeploy) ------------------- */
+async function postText(url, text, headers = {}) {
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', ...headers },
+    body: text,
+  });
+  let data = null;
+  try { data = await res.json(); } catch { data = null; }
+  if (!res.ok) throw new Error((data && (data.error || data.message)) || `HTTP ${res.status}`);
+  return data;
+}
+
+async function readPickedFile(inputId) {
+  const input = $(inputId);
+  const file = input?.files?.[0];
+  if (!file) {
+    toast('ابتدا یک فایل انتخاب کنید', 'err');
+    return null;
+  }
+  return file.text();
+}
+
+async function importPreview() {
+  const text = await readPickedFile('importFile');
+  if (!text) return;
+  try {
+    const data = await postText('/api/finance/backup/import?mode=preview', text);
+    $('importOut').textContent = JSON.stringify(data, null, 2);
+    toast('پیش‌نمایش فایل معتبر است (بدون تغییر داده)', 'ok');
+  } catch (err) {
+    $('importOut').textContent = `خطا: ${err.message}`;
+    toast(`پیش‌نمایش فایل ناموفق: ${err.message}`, 'err');
+  }
+}
+
+async function importApply() {
+  const text = await readPickedFile('importFile');
+  if (!text) return;
+  const second = requireSecondFactor();
+  if (!second) return;
+  const confirm = $('importConfirm').value.trim();
+  if (confirm !== 'RESTORE') return toast('عبارت تأیید باید RESTORE باشد', 'err');
+  if (!window.confirm('داده‌های فعلی با محتوای این فایل جای‌گزین می‌شوند. ادامه می‌دهید؟')) return;
+  try {
+    const data = await postText('/api/finance/backup/import?mode=apply&confirm=RESTORE', text, {
+      'x-finance-password': second.password,
+      'x-2fa-code': second.code,
+    });
+    $('importOut').textContent = JSON.stringify(data, null, 2);
+    clearSecondFactor();
+    toast('بازیابی از فایل انجام شد؛ تصاویر و کلید زنجیره نیز بازگردانده شدند', 'ok');
+    await loadBackup();
+    await loadPosture();
+    await loadSessions();
+  } catch (err) {
+    toast(`بازیابی از فایل ناموفق: ${err.message}`, 'err');
+  }
+}
+
+/* ---------------------------- کیت بازیابی کلیدها ---------------------------- */
+async function createKit() {
+  const passphrase = $('kitPassphrase').value;
+  if (String(passphrase).length < 12) return toast('گذرواژهٔ کیت باید حداقل ۱۲ نویسه باشد', 'err');
+  const second = requireSecondFactor();
+  if (!second) return;
+  try {
+    const res = await fetch('/api/finance/backup/recovery-kit', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase, ...second }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error((data && data.error) || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition') || '';
+    const name = (disposition.match(/filename="([^"]+)"/) || [])[1] || 'smart-bazaar-keys.sbkey';
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    clearSecondFactor();
+    $('kitPassphrase').value = '';
+    $('kitOut').textContent = `کیت ${name} ساخته و دانلود شد. آن را با گذرواژهٔ جداگانه در جای امن نگه دارید.`;
+    toast('کیت کلیدها ساخته و دانلود شد', 'ok');
+    await loadBackup();
+  } catch (err) {
+    toast(`ساخت کیت ناموفق: ${err.message}`, 'err');
+  }
+}
+
+async function installKit() {
+  const text = await readPickedFile('kitFile');
+  if (!text) return;
+  const passphrase = $('kitInstallPassphrase').value;
+  if (!passphrase) return toast('گذرواژهٔ کیت را وارد کنید', 'err');
+  const second = requireSecondFactor();
+  if (!second) return;
+  try {
+    const data = await postText('/api/finance/backup/recovery-kit/install', text.trim(), {
+      'x-kit-passphrase': passphrase,
+      'x-finance-password': second.password,
+      'x-2fa-code': second.code,
+    });
+    clearSecondFactor();
+    $('kitInstallPassphrase').value = '';
+    $('kitOut').textContent = `کلیدها نصب شد — اثر انگشت پشتیبان: ${data.keys?.fingerprint || '—'}`;
+    toast('کلیدهای بازیابی نصب شد', 'ok');
+    await loadBackup();
+  } catch (err) {
+    toast(`نصب کیت ناموفق: ${err.message}`, 'err');
   }
 }
 
@@ -487,6 +615,10 @@ $('schedSaveBtn').addEventListener('click', saveSchedule);
 $('backupNowBtn').addEventListener('click', runBackupNow);
 $('restorePreviewBtn').addEventListener('click', restorePreview);
 $('restoreApplyBtn').addEventListener('click', restoreApply);
+$('importPreviewBtn').addEventListener('click', importPreview);
+$('importApplyBtn').addEventListener('click', importApply);
+$('kitCreateBtn').addEventListener('click', createKit);
+$('kitInstallBtn').addEventListener('click', installKit);
 $('sessionsRefresh').addEventListener('click', loadSessions);
 $('revokeOthersBtn').addEventListener('click', revokeOthers);
 $('recoveryGenBtn').addEventListener('click', generateRecovery);

@@ -1929,7 +1929,9 @@ export function createApp() {
     const text = raw.trim();
     if (!text) throw new BackupError('backup_corrupt', 400);
     if (text.length > 100 * 1024 * 1024) throw new BackupError('backup_too_large', 413);
-    return Buffer.from(text, 'base64');
+    // فایل .sbbak متن ASCII با سرآغاز SBBAK1 است؛ ورودی base64 هم پذیرفته می‌شود
+    const isEnvelope = text.startsWith('SBBAK') || text.includes('{');
+    return Buffer.from(text, isEnvelope ? 'utf8' : 'base64');
   };
 
   app.post(
