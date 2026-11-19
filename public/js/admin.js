@@ -9,7 +9,29 @@ const T = (key, fallback) => {
   return value === key ? fallback : value;
 };
 
-const state = { user: null, overview: null, users: [], orders: [], tab: 'overview' };
+const state = { user: null, overview: null, users: [], orders: [], ads: { campaigns: [], stats: null }, tab: 'overview' };
+
+const AD_STATUS_FA = {
+  draft: 'پیش‌نویس',
+  awaiting_payment: 'در انتظار پرداخت',
+  in_review: 'در بازبینی',
+  scheduled: 'زمان‌بندی‌شده',
+  active: 'فعال',
+  completed: 'پایان‌یافته',
+  canceled: 'لغو‌شده',
+  rejected: 'رد‌شده',
+};
+const LOCALES = { fa: 'fa-IR', en: 'en-US', ar: 'ar-AE', tr: 'tr-TR' };
+
+function localAmount(campaign) {
+  const meta = campaign.currencyMeta || { symbol: campaign.currency, decimals: 2 };
+  const locale = LOCALES[getLang()] || LOCALES.fa;
+  try {
+    return `${new Intl.NumberFormat(locale, { maximumFractionDigits: meta.decimals }).format(campaign.totalLocal || 0)} ${meta.symbol}`;
+  } catch {
+    return `${campaign.totalLocal || 0} ${campaign.currency}`;
+  }
+}
 
 /* --------------------------------- ورود --------------------------------- */
 
@@ -150,6 +172,46 @@ function renderOrders() {
     .join('') || `<tr><td colspan="6" class="hint">${esc(T('no_orders', 'سفارشی ثبت نشده است'))}</td></tr>`;
 }
 
+/* --------------------------- کمپین‌های تبلیغاتی --------------------------- */
+
+async function loadAds() {
+  const data = await api('/api/admin/ads/campaigns');
+  state.ads = { campaigns: data.campaigns || [], stats: data.stats || null };
+  renderAds();
+}
+
+function renderAds() {
+  const { campaigns, stats } = state.ads;
+  const s = stats || {};
+  const byStatus = s.byStatus || {};
+  const usd = (n) => `$${Number(n || 0).toFixed(2)}`;
+  const cards = [
+    [T('ads_campaigns', 'کمپین‌ها'), s.total ?? campaigns.length],
+    [T('awaiting_payment', 'در انتظار پرداخت'), byStatus.awaiting_payment ?? 0],
+    [T('active', 'فعال'), byStatus.active ?? 0],
+    [T('revenue', 'درآمد تأییدشده'), usd(s.revenueUsd)],
+    [T('pipeline', 'در جریان'), usd(s.pipelineUsd)],
+  ];
+  $('#adStats').innerHTML = cards
+    .map(([label, value]) => `<div class="stat"><span class="hint">${esc(label)}</span><strong>${esc(value)}</strong></div>`)
+    .join('');
+
+  $('#adRows').innerHTML = campaigns.length
+    ? campaigns
+      .map((c) => `<tr>
+        <td class="mono">${esc(c.invoiceNo)}</td>
+        <td>${esc(c.title)}</td>
+        <td>${esc(c.countryName?.fa || c.country)}</td>
+        <td>${esc(c.durationDays)} روز</td>
+        <td>${esc(localAmount(c))}</td>
+        <td>${esc(usd(c.totalUsd))}</td>
+        <td><span class="status">${esc(AD_STATUS_FA[c.status] || c.status)}</span></td>
+        <td>${esc(fmtDate(c.createdAt))}</td>
+      </tr>`)
+      .join('')
+    : `<tr><td colspan="8" class="hint">${esc(T('no_data', 'کمپینی ثبت نشده است'))}</td></tr>`;
+}
+
 /* -------------------------------- تب‌ها -------------------------------- */
 
 function switchTab(tab) {
@@ -159,12 +221,14 @@ function switchTab(tab) {
   if (tab === 'overview') loadOverview().catch(() => {});
   if (tab === 'users') loadUsers().catch(() => {});
   if (tab === 'orders') loadOrders().catch(() => {});
+  if (tab === 'ads') loadAds().catch(() => {});
 }
 
 function renderAll() {
   if (state.tab === 'overview') renderOverview();
   if (state.tab === 'users') renderUsers();
   if (state.tab === 'orders') renderOrders();
+  if (state.tab === 'ads') renderAds();
 }
 
 /* --------------------------------- شروع --------------------------------- */
