@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 export const DB_FILE = path.join(DATA_DIR, 'db.json');
-export const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
+export const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public', 'uploads');
 
 const EMPTY = () => ({
   users: [],
