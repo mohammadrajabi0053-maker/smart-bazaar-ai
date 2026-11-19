@@ -2,6 +2,7 @@
 // همهٔ کنترل‌ها سمت سرور اجرا می‌شوند و هیچ راز یا کلیدی در این فایل ذخیره نمی‌شود.
 import crypto from 'node:crypto';
 import { getDb, saveDbSoon } from './store.js';
+import { normalizeSeverity, trimSecurityEvents } from './monitor.js';
 
 export const CSRF_COOKIE = 'sb_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
@@ -50,7 +51,7 @@ export function recordSecurityEvent({
   const event = {
     id: `sec_${crypto.randomBytes(8).toString('hex')}`,
     type: String(type || 'unknown').slice(0, 60),
-    severity: ['info', 'warning', 'critical'].includes(severity) ? severity : 'info',
+    severity: normalizeSeverity(severity),
     ip: String(ip || '').slice(0, 60),
     identity: String(identity || '').slice(0, 120),
     path: String(path || '').slice(0, 160),
@@ -59,6 +60,7 @@ export function recordSecurityEvent({
   };
   events.push(event);
   db.securityEvents = events.slice(-MAX_EVENTS);
+  trimSecurityEvents(db);
   saveDbSoon();
   return event;
 }
