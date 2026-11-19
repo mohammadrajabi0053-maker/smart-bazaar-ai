@@ -1281,6 +1281,14 @@ export function createApp() {
 
   /* --------------------------- مالی محرمانه (مالک) --------------------------- */
 
+  // قرارداد امنیتی: همهٔ مسیرهای مالی مالک‌محور پیش از تطبیق متد احراز هویت می‌شوند.
+  // بنابراین درخواست ناشناس حتی با متد نامعتبر هم ۴۰۱ می‌گیرد و با ۴۰۴ وجود مسیر را کشف نمی‌کند.
+  // مسیرهای توکن‌محور /api/finance/grants/* جدا کنترل می‌شوند و از این گارد مستثنی هستند.
+  app.use('/api/finance', (req, res, next) => {
+    if (/^\/api\/finance\/grants(\/|\?|$)/.test(req.originalUrl)) return next();
+    return requireOwner(req, res, next);
+  });
+
   app.get('/api/finance/overview', requireOwner, financeLimiter, (req, res) => {
     const db = getDb();
     const includeDemo = req.query.includeDemo === '1';
@@ -3233,6 +3241,15 @@ export function createApp() {
     if (!req.user) return res.redirect('/login?next=/business');
     if (!directoryRoles.includes(req.user.role)) return res.status(403).type('html').send(deniedHtml);
     return next();
+  });
+
+  // صفحهٔ اصلی: اگر کاربر از یک مسیر محافظت‌شده هدایت شده باشد، دلیل ورود را نشان بده
+  app.get('/', (req, res, next) => {
+    if (clean(req.query.next, 40) !== '/security') return next();
+    let html = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
+    const banner = '<div class="sb-login-notice" role="status" style="margin:16px auto;max-width:760px;padding:14px 18px;border-radius:14px;background:#111827;color:#f9fafb;text-align:center;line-height:1.9">برای ورود به مرکز امنیت هوشمند بازار، ابتدا با حساب مدیر اصلی وارد شوید.</div>';
+    html = html.replace(/<body([^>]*)>/, (match, attrs) => `<body${attrs}>${banner}`);
+    res.type('html').send(html);
   });
 
   app.use(express.static(PUBLIC_DIR, { maxAge: '1h', extensions: ['html'] }));
