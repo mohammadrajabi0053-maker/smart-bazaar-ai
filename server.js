@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { phaseById, phaseCatalog } from './src/phases.js';
 import {
   CSRF_COOKIE, csrfGuard, csrfIssue, clearLoginFailures, loginStatus, originGuard,
-  registerLoginFailure, securityHeaders,
+  registerLoginFailure, securityHeaders, recordSecurityEvent, LOGIN_MAX_FAILURES,
 } from './src/security.js';
 
 import {
@@ -441,11 +441,37 @@ export function createApp() {
     const db = getDb();
     const email = clean(req.body?.email, 120).toLowerCase();
     const password = String(req.body?.password || '');
+
+    const attempt = loginStatus(req, email);
+    if (attempt.blocked) {
+      recordSecurityEvent({
+        type: 'login_blocked',
+        severity: 'warning',
+        ip: req.ip,
+        identity: email,
+        path: '/api/auth/login',
+        detail: `failures=${attempt.failures}`,
+      });
+      const retryAfter = Math.max(1, Math.ceil(attempt.retryAfterMs / 1000));
+      res.setHeader('Retry-After', String(retryAfter));
+      return res.status(429).json({ error: 'too_many_attempts', retryAfterSeconds: retryAfter });
+    }
+
     const user = db.users.find((u) => u.email === email);
     if (!user || !verifyPassword(password, user.passwordHash)) {
+      const failures = registerLoginFailure(req, email);
+      recordSecurityEvent({
+        type: 'login_failed',
+        severity: failures >= LOGIN_MAX_FAILURES ? 'warning' : 'info',
+        ip: req.ip,
+        identity: email,
+        path: '/api/auth/login',
+        detail: `failures=${failures}`,
+      });
       return res.status(401).json({ error: 'invalid_credentials' });
     }
     if (user.status === 'blocked') return res.status(403).json({ error: 'account_blocked' });
+    clearLoginFailures(req, email);
     setSessionCookie(res, user);
     res.json({ user: publicUser(user) });
   });
