@@ -33,13 +33,14 @@ test.after(() => {
 
 function client() {
   let cookie = '';
-  return async (pathname, { method = 'GET', body, headers = {} } = {}) => {
+  return async (pathname, { method = 'GET', body, headers = {}, redirect = 'follow' } = {}) => {
     const outHeaders = { ...headers };
     if (body !== undefined) outHeaders['content-type'] = 'application/json';
     if (cookie) outHeaders.cookie = cookie;
     const res = await fetch(base + pathname, {
       method,
       headers: outHeaders,
+      redirect,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     for (const raw of res.headers.getSetCookie?.() || []) {
@@ -523,7 +524,7 @@ test('دسترسی غیرمالک به بخش‌های امنیتی و حفظ ق
   }
 
   assert.equal((await anon('/api/finance/backup/status')).status, 401, 'بدون نشست باید ۴۰۱ باشد');
-  assert.equal((await anon('/security')).status, 302, 'بدون نشست باید به ورود هدایت شود');
+  assert.equal((await anon('/security', { redirect: 'manual' })).status, 302, 'بدون نشست باید به ورود هدایت شود');
 
   const products = await anon('/api/products');
   assert.equal(products.status, 200);
