@@ -185,6 +185,53 @@ export function localize(node = document) {
   node.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
 }
 
+/* ------------------------------- CSRF ------------------------------- */
+const STATE_CHANGING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+export function csrfTokenFromCookie() {
+  const match = document.cookie.match(/(?:^|;\s*)sb_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+let csrfPending = null;
+
+export function ensureCsrfToken() {
+  const existing = csrfTokenFromCookie();
+  if (existing) return Promise.resolve(existing);
+  if (!csrfPending) {
+    csrfPending = fetch('/api/csrf', { credentials: 'same-origin' })
+      .then((res) => res.json())
+      .then((data) => data?.token || '')
+      .catch(() => '')
+      .finally(() => { csrfPending = null; });
+  }
+  return csrfPending;
+}
+
+// افزودن خودکار توکن CSRF به همهٔ درخواست‌های تغییردهندهٔ هم‌مبدأ
+if (typeof window !== 'undefined' && !window.__sbCsrfPatched) {
+  window.__sbCsrfPatched = true;
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (input, init = {}) => {
+    const request = typeof input === 'string' ? null : input;
+    const url = typeof input === 'string' ? input : (request?.url || '');
+    const method = String(init.method || request?.method || 'GET').toUpperCase();
+    const sameOrigin = !/^[a-z]+:\/\//i.test(url) || url.startsWith(window.location.origin);
+    if (STATE_CHANGING.has(method) && sameOrigin) {
+      let token = csrfTokenFromCookie();
+      if (!token) {
+        try { token = await ensureCsrfToken(); } catch { token = ''; }
+      }
+      if (token) {
+        const headers = new Headers(init.headers || request?.headers);
+        if (!headers.has('x-csrf-token')) headers.set('x-csrf-token', token);
+        init = { ...init, headers };
+      }
+    }
+    return nativeFetch(input, init);
+  };
+}
+
 /* ------------------------------- API ------------------------------- */
 export async function api(path, { method = 'GET', body, headers = {} } = {}) {
   const res = await fetch(path, {
