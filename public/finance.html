@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="پنل مالی محرمانه — فقط مدیر اصلی">
+<title>پنل مالی محرمانه | بازار هوشمند</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/finance.css">
+</head>
+<body class="fin-body">
+
+<header class="site-header fin-header">
+  <div class="container header-row">
+    <a class="brand" href="/">
+      <span class="logo">🔐</span>
+      <span class="name">بازار هوشمند</span>
+    </a>
+    <div class="header-actions">
+      <a class="icon-btn" href="/" data-i18n="navStore">فروشگاه</a>
+      <a class="icon-btn" href="/ads" data-i18n="navAds">تبلیغات</a>
+      <a class="icon-btn" href="/admin" data-i18n="navAdmin">مدیریت</a>
+      <select id="langSelect" class="lang-select" aria-label="زبان">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+      <button class="icon-btn" id="logoutBtn" type="button">🚪 <span data-i18n="logout">خروج</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="container fin-main">
+
+  <section class="fin-hero">
+    <div class="fin-hero-text">
+      <h1 data-i18n="heroTitle">پنل مالی محرمانه</h1>
+      <p data-i18n="heroSub">این بخش فقط برای مدیر اصلی است. همهٔ محاسبات در سرور انجام می‌شود و هر بازدید ثبت می‌شود.</p>
+    </div>
+    <div class="fin-hero-badges">
+      <span class="fin-badge owner">👑 <span data-i18n="ownerBadge">مدیر اصلی</span></span>
+      <span class="fin-badge warn">🧾 <span data-i18n="internalReport">گزارش مدیریتی داخلی</span></span>
+      <span class="fin-badge off">🔒 <span data-i18n="paymentsOff">پرداخت واقعی غیرفعال</span></span>
+      <span class="fin-badge off">🏦 <span data-i18n="payoutOff">برداشت واقعی غیرفعال</span></span>
+      <span class="fin-badge" id="chainBadge">⛓️ —</span>
+    </div>
+  </section>
+
+  <nav class="fin-tabs" role="tablist" aria-label="بخش‌ها">
+    <button class="fin-tab active" data-tab="overview" role="tab" aria-selected="true" type="button" data-i18n="tabOverview">نمای کلی</button>
+    <button class="fin-tab" data-tab="entries" role="tab" aria-selected="false" type="button" data-i18n="tabEntries">تراکنش‌ها</button>
+    <button class="fin-tab" data-tab="wallet" role="tab" aria-selected="false" type="button" data-i18n="tabWallet">کیف پول</button>
+    <button class="fin-tab" data-tab="reports" role="tab" aria-selected="false" type="button" data-i18n="tabReports">گزارش‌ها و مجوزها</button>
+    <button class="fin-tab" data-tab="team" role="tab" aria-selected="false" type="button" data-i18n="tabTeam">تیم و دسترسی</button>
+    <button class="fin-tab" data-tab="security" role="tab" aria-selected="false" type="button" data-i18n="tabSecurity">امنیت</button>
+    <button class="fin-tab" data-tab="audit" role="tab" aria-selected="false" type="button" data-i18n="tabAudit">حسابرسی</button>
+  </nav>
+
+  <!-- نمای کلی -->
+  <section class="fin-panel active" id="panel-overview">
+    <form class="fin-filters" id="ovFilters">
+      <label><span data-i18n="from">از تاریخ</span><input type="date" id="ovFrom"></label>
+      <label><span data-i18n="to">تا تاریخ</span><input type="date" id="ovTo"></label>
+      <label><span data-i18n="country">کشور</span><select id="ovCountry"><option value="" data-i18n="all">همه</option></select></label>
+      <label><span data-i18n="source">منبع درآمد</span><select id="ovSource"><option value="" data-i18n="all">همه</option></select></label>
+      <label><span data-i18n="bucket">بازهٔ گزارش</span>
+        <select id="ovBucket">
+          <option value="day" data-i18n="day">روزانه</option>
+          <option value="week" data-i18n="week">هفتگی</option>
+          <option value="month" selected data-i18n="month">ماهانه</option>
+          <option value="year" data-i18n="year">سالانه</option>
+        </select>
+      </label>
+      <label class="fin-check"><input type="checkbox" id="ovDemo"> <span data-i18n="includeDemo">نمایش دادهٔ آزمایشی</span></label>
+      <button class="fin-btn primary" type="submit" data-i18n="apply">اعمال</button>
+      <button class="fin-btn ghost" type="button" id="ovReset" data-i18n="reset">بازنشانی</button>
+      <a class="fin-btn ghost" id="exportCsv" href="/api/finance/export?format=csv" data-i18n="downloadCsv">خروجی Excel/CSV</a>
+      <button class="fin-btn ghost" type="button" id="printBtn" data-i18n="printPdf">چاپ / PDF</button>
+    </form>
+
+    <div class="fin-cards" id="ovCards"></div>
+
+    <div class="fin-grid2">
+      <div class="fin-box">
+        <h3 data-i18n="series">روند درآمد و هزینه</h3>
+        <div class="fin-chart" id="seriesChart"></div>
+      </div>
+      <div class="fin-box">
+        <h3 data-i18n="bySource">به تفکیک منبع</h3>
+        <table class="fin-table compact"><thead><tr>
+          <th data-i18n="source">منبع</th><th data-i18n="income">درآمد</th><th data-i18n="expense">هزینه</th><th data-i18n="count">تعداد</th>
+        </tr></thead><tbody id="bySourceBody"></tbody></table>
+      </div>
+    </div>
+
+    <div class="fin-grid2">
+      <div class="fin-box">
+        <h3 data-i18n="byCountry">به تفکیک کشور</h3>
+        <table class="fin-table compact"><thead><tr>
+          <th data-i18n="country">کشور</th><th data-i18n="income">درآمد</th><th data-i18n="count">تعداد</th>
+        </tr></thead><tbody id="byCountryBody"></tbody></table>
+      </div>
+      <div class="fin-box">
+        <h3 data-i18n="byCurrency">به تفکیک ارز</h3>
+        <table class="fin-table compact"><thead><tr>
+          <th data-i18n="currency">ارز</th><th data-i18n="income">درآمد</th><th data-i18n="count">تعداد</th>
+        </tr></thead><tbody id="byCurrencyBody"></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- تراکنش‌ها -->
+  <section class="fin-panel" id="panel-entries">
+    <form class="fin-form" id="entryForm">
+      <h3 data-i18n="addEntry">ثبت درآمد / هزینه</h3>
+      <div class="fin-form-grid">
+        <label><span data-i18n="kind">نوع</span>
+          <select id="entryKind">
+            <option value="income" data-i18n="income">درآمد</option>
+            <option value="expense" data-i18n="expense">هزینه</option>
+          </select>
+        </label>
+        <label><span data-i18n="source">منبع</span><select id="entrySource"></select></label>
+        <label><span data-i18n="amountUsd">مبلغ (دلار)</span><input id="entryAmount" type="number" min="0.01" step="0.01" required></label>
+        <label><span data-i18n="currency">ارز محلی</span><select id="entryCurrency"></select></label>
+        <label><span data-i18n="country">کشور</span><select id="entryCountry"><option value="" data-i18n="all">همه</option></select></label>
+        <label><span data-i18n="account">حساب</span><select id="entryAccount"></select></label>
+        <label class="fin-check"><input type="checkbox" id="entrySettled" checked> <span data-i18n="settled">تسویه‌شده</span></label>
+        <label class="wide"><span data-i18n="note">توضیح</span><input id="entryNote" maxlength="200"></label>
+      </div>
+      <button class="fin-btn primary" type="submit" data-i18n="save">ثبت</button>
+    </form>
+
+    <form class="fin-filters" id="entryFilters">
+      <label><span data-i18n="from">از تاریخ</span><input type="date" id="eFrom"></label>
+      <label><span data-i18n="to">تا تاریخ</span><input type="date" id="eTo"></label>
+      <label><span data-i18n="kind">نوع</span>
+        <select id="eKind">
+          <option value="" data-i18n="all">همه</option>
+          <option value="income" data-i18n="income">درآمد</option>
+          <option value="expense" data-i18n="expense">هزینه</option>
+          <option value="transfer" data-i18n="transfer">انتقال</option>
+          <option value="withdrawal" data-i18n="withdrawal">برداشت</option>
+        </select>
+      </label>
+      <label><span data-i18n="country">کشور</span><select id="eCountry"><option value="" data-i18n="all">همه</option></select></label>
+      <label><span data-i18n="search">جست‌وجو</span><input id="eQ" placeholder="شناسه، توضیح، کشور"></label>
+      <button class="fin-btn primary" type="submit" data-i18n="apply">اعمال</button>
+    </form>
+
+    <p class="fin-meta" id="entriesMeta"></p>
+    <div class="fin-table-wrap">
+      <table class="fin-table"><thead><tr>
+        <th data-i18n="date">تاریخ</th>
+        <th data-i18n="kind">نوع</th>
+        <th data-i18n="source">منبع</th>
+        <th data-i18n="country">کشور</th>
+        <th data-i18n="currency">ارز</th>
+        <th data-i18n="amountUsd">دلار</th>
+        <th data-i18n="account">حساب</th>
+        <th data-i18n="hash">هش</th>
+      </tr></thead><tbody id="entriesBody"></tbody></table>
+    </div>
+  </section>
+
+  <!-- کیف پول -->
+  <section class="fin-panel" id="panel-wallet">
+    <div class="fin-cards" id="walletCards"></div>
+    <div class="fin-box">
+      <h3 data-i18n="accounts">حساب‌ها</h3>
+      <div class="fin-accounts" id="accountsList"></div>
+    </div>
+
+    <div class="fin-grid2">
+      <form class="fin-form" id="transferForm">
+        <h3 data-i18n="transfer">انتقال داخلی</h3>
+        <label><span data-i18n="fromAccount">از حساب</span><select id="trFrom"></select></label>
+        <label><span data-i18n="toAccount">به حساب</span><select id="trTo"></select></label>
+        <label><span data-i18n="amountUsd">مبلغ (دلار)</span><input id="trAmount" type="number" min="0.01" step="0.01" required></label>
+        <label><span data-i18n="note">توضیح</span><input id="trNote" maxlength="200"></label>
+        <button class="fin-btn primary" type="submit" data-i18n="save">ثبت</button>
+      </form>
+
+      <form class="fin-form" id="withdrawForm">
+        <h3 data-i18n="newWithdrawal">درخواست برداشت</h3>
+        <label><span data-i18n="amountUsd">مبلغ (دلار)</span><input id="wdAmount" type="number" min="1" step="0.01" required></label>
+        <label><span data-i18n="account">حساب</span><select id="wdAccount"></select></label>
+        <label><span data-i18n="method">روش دریافت</span>
+          <select id="wdMethod">
+            <option value="bank">bank</option>
+            <option value="crypto">crypto</option>
+            <option value="cash">cash</option>
+          </select>
+        </label>
+        <label><span data-i18n="note">توضیح</span><input id="wdNote" maxlength="200"></label>
+        <p class="fin-hint" data-i18n="payoutNotice">در این نسخه هیچ برداشت واقعی انجام نمی‌شود؛ فقط ثبت و تأیید چندمرحله‌ای.</p>
+        <button class="fin-btn primary" type="submit" data-i18n="requestWithdrawal">ثبت درخواست</button>
+      </form>
+    </div>
+
+    <div class="fin-box">
+      <h3 data-i18n="withdrawals">برداشت‌ها</h3>
+      <div class="fin-table-wrap">
+        <table class="fin-table"><thead><tr>
+          <th data-i18n="date">تاریخ</th>
+          <th data-i18n="amountUsd">دلار</th>
+          <th data-i18n="account">حساب</th>
+          <th data-i18n="stage">مرحله</th>
+          <th data-i18n="actions">عملیات</th>
+        </tr></thead><tbody id="withdrawalsBody"></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- گزارش‌ها -->
+  <section class="fin-panel" id="panel-reports">
+    <form class="fin-form" id="grantForm">
+      <h3 data-i18n="newReport">ساخت گزارش اختصاصی</h3>
+      <div class="fin-form-grid">
+        <label><span data-i18n="recipientName">نام دریافت‌کننده</span><input id="gName" required minlength="2" maxlength="80"></label>
+        <label><span data-i18n="recipientRole">نقش دریافت‌کننده</span>
+          <select id="gRole">
+            <option value="technical_admin" data-i18n="technicalAdmin">مدیر فنی</option>
+            <option value="sub_admin" data-i18n="subAdmin">مدیر فرعی</option>
+            <option value="accountant" data-i18n="accountant">حسابدار</option>
+          </select>
+        </label>
+        <label><span data-i18n="mode">مبنای گزارش</span>
+          <select id="gMode">
+            <option value="percent" data-i18n="percentMode">درصدی از درآمد</option>
+            <option value="fixed" data-i18n="fixedMode">مبلغ مشخص</option>
+          </select>
+        </label>
+        <label><span data-i18n="percent">درصد</span><input id="gPercent" type="number" min="0.1" max="100" step="0.1" value="10"></label>
+        <label><span data-i18n="fixedUsd">مبلغ مشخص (دلار)</span><input id="gFixed" type="number" min="0" step="0.01" value="0"></label>
+        <label><span data-i18n="from">از تاریخ</span><input type="date" id="gFrom"></label>
+        <label><span data-i18n="to">تا تاریخ</span><input type="date" id="gTo"></label>
+        <label><span data-i18n="expiryDays">اعتبار (روز)</span><input id="gExpiry" type="number" min="1" max="365" value="7"></label>
+        <label><span data-i18n="country">کشور</span><select id="gCountries" multiple size="4"></select></label>
+        <label><span data-i18n="source">منبع</span><select id="gSources" multiple size="4"></select></label>
+      </div>
+      <div class="fin-perm-grid">
+        <fieldset><legend data-i18n="fields">اطلاعات قابل مشاهده</legend><div id="gFields"></div></fieldset>
+        <fieldset><legend data-i18n="permissions">مجوزها</legend><div id="gPerms"></div></fieldset>
+      </div>
+      <p class="fin-hint" data-i18n="reportHint">ارسال گزارش فقط پس از دو مرحله تأیید (رمز + کد Authenticator و سپس تأیید نهایی) امکان‌پذیر است.</p>
+      <button class="fin-btn primary" type="submit" data-i18n="create">ساخت گزارش</button>
+    </form>
+
+    <div class="fin-box">
+      <h3 data-i18n="grants">مجوزهای گزارش</h3>
+      <div class="fin-table-wrap">
+        <table class="fin-table"><thead><tr>
+          <th data-i18n="trackingId">شناسه رهگیری</th>
+          <th data-i18n="recipientName">دریافت‌کننده</th>
+          <th data-i18n="amount">مبلغ</th>
+          <th data-i18n="status">وضعیت</th>
+          <th data-i18n="expiresAt">انقضا</th>
+          <th data-i18n="actions">عملیات</th>
+        </tr></thead><tbody id="grantsBody"></tbody></table>
+      </div>
+      <div id="grantDetail" class="fin-detail" hidden></div>
+    </div>
+
+    <div class="fin-box">
+      <h3 data-i18n="sentReports">گزارش‌های ارسال‌شده</h3>
+      <div class="fin-table-wrap">
+        <table class="fin-table"><thead><tr>
+          <th data-i18n="trackingId">شناسه رهگیری</th>
+          <th data-i18n="amount">مبلغ</th>
+          <th data-i18n="date">تاریخ</th>
+          <th data-i18n="expiresAt">انقضا</th>
+        </tr></thead><tbody id="sentBody"></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- تیم -->
+  <section class="fin-panel" id="panel-team">
+    <div class="fin-box">
+      <h3 data-i18n="team">تیم</h3>
+      <p class="fin-hint" data-i18n="teamHint">مدیران فرعی و فنی به‌صورت پیش‌فرض هیچ دسترسی مالی ندارند و فقط گزارش‌هایی را می‌بینند که شما صادر کرده‌اید.</p>
+      <div class="fin-table-wrap">
+        <table class="fin-table"><thead><tr>
+          <th data-i18n="name">نام</th>
+          <th data-i18n="email">ایمیل</th>
+          <th data-i18n="role">نقش</th>
+          <th data-i18n="status">وضعیت</th>
+          <th data-i18n="actions">عملیات</th>
+        </tr></thead><tbody id="teamBody"></tbody></table>
+      </div>
+    </div>
+    <form class="fin-form" id="teamForm">
+      <h3 data-i18n="addAdmin">افزودن مدیر فرعی / فنی</h3>
+      <div class="fin-form-grid">
+        <label><span data-i18n="name">نام</span><input id="tName" required minlength="3" maxlength="80"></label>
+        <label><span data-i18n="email">ایمیل</span><input id="tEmail" type="email" required></label>
+        <label><span data-i18n="password">رمز عبور</span><input id="tPassword" type="password" minlength="8" required autocomplete="new-password"></label>
+      </div>
+      <button class="fin-btn primary" type="submit" data-i18n="save">ثبت</button>
+    </form>
+  </section>
+
+  <!-- امنیت -->
+  <section class="fin-panel" id="panel-security">
+    <div class="fin-grid2">
+      <div class="fin-box">
+        <h3 data-i18n="twoFactor">احراز هویت دومرحله‌ای</h3>
+        <p id="tfStatus" class="fin-meta"></p>
+        <div id="tfSetup" hidden>
+          <p data-i18n="setupHint">کلید را در برنامه Authenticator ثبت کنید، سپس کد ۶ رقمی را وارد کنید.</p>
+          <code class="fin-secret" id="tfSecret"></code>
+          <a class="fin-link" id="tfOtpLink" target="_blank" rel="noopener" data-i18n="openInApp">باز کردن در برنامه Authenticator</a>
+          <form class="fin-form inline" id="tfEnableForm">
+            <label><span data-i18n="code">کد ۶ رقمی</span><input id="tfCode" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required></label>
+            <button class="fin-btn primary" type="submit" data-i18n="enable">فعال‌سازی</button>
+          </form>
+        </div>
+        <div class="fin-actions">
+          <button class="fin-btn" id="tfSetupBtn" type="button" data-i18n="setup2fa">راه‌اندازی ۲FA</button>
+          <button class="fin-btn danger" id="tfDisableBtn" type="button" data-i18n="disable">غیرفعال‌سازی</button>
+          <button class="fin-btn" id="logoutAllBtn" type="button" data-i18n="logoutAll">خروج از همهٔ دستگاه‌ها</button>
+        </div>
+      </div>
+      <div class="fin-box">
+        <h3 data-i18n="securityStatus">وضعیت امنیتی</h3>
+        <div id="secMeta" class="fin-kv"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- حسابرسی -->
+  <section class="fin-panel" id="panel-audit">
+    <div class="fin-box">
+      <h3 data-i18n="audit">رویدادهای حسابرسی</h3>
+      <div class="fin-table-wrap">
+        <table class="fin-table"><thead><tr>
+          <th data-i18n="date">تاریخ</th>
+          <th data-i18n="action">رویداد</th>
+          <th data-i18n="target">هدف</th>
+          <th data-i18n="actor">کاربر</th>
+        </tr></thead><tbody id="auditBody"></tbody></table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="fin-modal" id="modal" hidden>
+  <div class="fin-modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody" class="fin-modal-body"></div>
+    <div class="fin-modal-actions">
+      <button class="fin-btn ghost" id="modalCancel" type="button" data-i18n="close">بستن</button>
+      <button class="fin-btn primary" id="modalOk" type="button" data-i18n="submit">تأیید</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/js/finance.js"></script>
+</body>
+</html>
