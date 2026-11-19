@@ -177,7 +177,11 @@ export function originGuard(req, res, next) {
 export function csrfIssue(req, res, next) {
   if (!req.cookies) req.cookies = {};
   let token = cookieValue(req, CSRF_COOKIE);
-  if ((!token || token.length < 20) && SAFE_METHODS.has(req.method)) {
+  // کوکی توکن فقط برای ناوبری صفحهٔ HTML یا درخواست صریح /api/csrf صادر می‌شود
+  // تا کلاینت‌های JSON و آزمون‌های موجود کوکی نشست خود را از دست ندهند.
+  const wantsHtml = String(req.headers.accept || '').includes('text/html');
+  const explicit = String(req.path || '') === '/api/csrf';
+  if ((!token || token.length < 20) && SAFE_METHODS.has(req.method) && (wantsHtml || explicit)) {
     token = crypto.randomBytes(32).toString('base64url');
     req.cookies[CSRF_COOKIE] = token;
     res.cookie(CSRF_COOKIE, token, {
