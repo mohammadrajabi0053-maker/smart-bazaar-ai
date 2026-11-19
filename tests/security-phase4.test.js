@@ -546,3 +546,33 @@ test('دسترسی غیرمالک به بخش‌های امنیتی و حفظ ق
   assert.equal(page.status, 200);
   assert.match(page.text, /مرکز امنیت هوشمند بازار/);
 });
+
+/* ---------- قرارداد امنیتی API مالی: احراز هویت پیش از تطبیق متد ---------- */
+
+test('درخواست ناشناس به مسیرهای مالی مالک‌محور با هر متدی ۴۰۱ می‌گیرد', async () => {
+  for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) {
+    const res = await anon('/api/finance/backup/recovery-kit', { method });
+    assert.equal(res.status, 401, `${method} ناشناس روی مسیر کیت باید ۴۰۱ باشد`);
+    assert.equal(res.json?.error, 'auth_required');
+  }
+  const importGet = await anon('/api/finance/backup/import');
+  assert.equal(importGet.status, 401, 'مسیر بازیابی از فایل نیز باید پیش از متد احراز هویت شود');
+
+  // مسیر توکن‌محور گزارش از گارد مالک مستثنی است و بدون توکن معتبر ۴۰۴ می‌دهد
+  const grant = await anon('/api/finance/grants/unknown-token-value');
+  assert.notEqual(grant.status, 401, 'مسیر توکن‌محور نباید به نشست مالک وابسته شود');
+
+  // مالک با متد نامعتبر داده نمی‌گیرد و فقط ۴۰۴ می‌بیند
+  const { owner } = await ownerSession();
+  const ownerGet = await owner('/api/finance/backup/recovery-kit');
+  assert.equal(ownerGet.status, 404, 'مالک با GET نباید کیت کلیدها را دریافت کند');
+});
+
+test('هدایت صفحهٔ امنیت به ورود، پیام مرکز امنیت را نشان می‌دهد', async () => {
+  const redirect = await anon('/security', { redirect: 'manual' });
+  assert.equal(redirect.status, 302, 'صفحهٔ امنیت باید ناشناس را به ورود هدایت کند');
+  assert.equal(redirect.headers.get('location'), '/?next=/security');
+  const followed = await anon('/?next=/security');
+  assert.equal(followed.status, 200);
+  assert.match(followed.text, /مرکز امنیت/, 'صفحهٔ مقصد باید دلیل ورود را توضیح دهد');
+});
