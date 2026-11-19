@@ -5,6 +5,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
+import { phaseById, phaseCatalog } from './src/phases.js';
+
 import {
   CATEGORIES, LANGS, ORDER_STATUSES, STATUS_FLOW, categoryLabel, isValidCategory,
 } from './src/catalog.js';
@@ -2384,6 +2386,17 @@ export function createApp() {
 
   /* --------------------------------- فایل‌ها --------------------------------- */
 
+  // مرکز بررسی سه فاز — فقط شمارش و وضعیت؛ بدون مبلغ، موجودی یا اطلاعات تماس
+  app.get('/api/phases', (_req, res) => {
+    res.json(phaseCatalog(getDb()));
+  });
+
+  app.get('/api/phases/:id', (req, res) => {
+    const phase = phaseById(getDb(), req.params.id);
+    if (!phase) return res.status(404).json({ error: 'phase_not_found' });
+    return res.json(phase);
+  });
+
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
 
   // گارد پیش از فایل‌های استاتیک: /finance نباید با extensions استاتیک دور زده شود
@@ -2417,6 +2430,16 @@ export function createApp() {
     if (!req.user) return res.redirect('/login?next=/business');
     if (!directoryRoles.includes(req.user.role)) return res.status(403).type('html').send(deniedHtml);
     return res.sendFile(path.join(PUBLIC_DIR, 'business.html'));
+  });
+
+  // مرکز بررسی سه فاز — بخش مستقل مشاهده و آزمایش هر فاز
+  app.get(['/review', '/review.html'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'review.html')));
+  app.get('/phases', (_req, res) => res.redirect('/review'));
+  app.get('/phases/:id', (req, res) => {
+    if (!['1', '2', '3'].includes(String(req.params.id))) {
+      return res.status(404).sendFile(path.join(PUBLIC_DIR, '404.html'));
+    }
+    return res.sendFile(path.join(PUBLIC_DIR, 'phase.html'));
   });
 
   app.use((req, res) => {
