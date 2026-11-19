@@ -14,6 +14,15 @@ const EMPTY = () => ({
   reviews: [],
   assistantLogs: [],
   adCampaigns: [],
+  // فاز سوم: بانک اطلاعات اصناف، متقاضیان تبلیغات، CRM و حریم خصوصی
+  businesses: [],
+  adLeads: [],
+  crmActivities: [],
+  optOuts: [],
+  deletionRequests: [],
+  otpChallenges: [],
+  auditLog: [],
+  discounts: [],
   settings: { createdAt: new Date().toISOString() },
 });
 
