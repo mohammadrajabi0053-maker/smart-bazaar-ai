@@ -1,0 +1,188 @@
+/* مرکز تبلیغات هوشمند — استایل اختصاصی صفحهٔ تبلیغات و پیش‌فاکتور */
+
+.ads-body { background: radial-gradient(1200px 500px at 80% -10%, #1f2a44 0%, #0f172a 45%, #0b1220 100%); color: #e7ecf5; min-height: 100vh; }
+
+.ads-hero { padding: 34px 0 8px; }
+.ads-hero h1 { font-size: clamp(1.5rem, 4vw, 2.1rem); margin: 0 0 8px; letter-spacing: -.01em; }
+.ads-hero p { margin: 0; color: #a9b6cc; max-width: 62ch; line-height: 1.9; }
+.ads-badge { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.ads-badge-item {
+  display: inline-flex; align-items: center; gap: 6px; font-size: .82rem;
+  padding: 6px 11px; border-radius: 999px; background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.12); color: #d7e0ee;
+}
+
+.ads-main { padding-bottom: 48px; }
+
+.ads-notice {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+  margin: 16px 0 18px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(245, 158, 11, .12); border: 1px solid rgba(245, 158, 11, .35); color: #fde9c4;
+  font-size: .88rem; line-height: 1.8;
+}
+.ads-notice strong { color: #fbbf24; }
+
+.ads-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; align-items: start; }
+
+.ads-body .panel {
+  background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.10);
+  border-radius: 16px; padding: 18px;
+}
+.ads-body .panel h2 { font-size: 1rem; margin: 0 0 14px; color: #f2f6fc; }
+
+.field { margin-bottom: 14px; }
+.field > label { display: block; font-size: .82rem; color: #a9b6cc; margin-bottom: 6px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hint { font-size: .76rem; color: #8593ab; margin: 6px 0 0; line-height: 1.7; }
+
+.ads-body select, .ads-body input, .ads-body textarea {
+  width: 100%; padding: 10px 12px; border-radius: 10px;
+  background: rgba(9, 15, 28, .75); color: #eef3fa;
+  border: 1px solid rgba(255,255,255,.14); font: inherit; font-size: .9rem;
+}
+.ads-body select:focus, .ads-body input:focus, .ads-body textarea:focus {
+  outline: 2px solid #4f7cff; outline-offset: 1px; border-color: transparent;
+}
+.ads-body option { background: #0f172a; color: #eef3fa; }
+
+.ads-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ads-chip {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 9px 12px; border-radius: 12px; font-size: .84rem;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.13); color: #cbd6e6;
+}
+.ads-chip input { position: absolute; opacity: 0; width: 0; height: 0; }
+.ads-chip small { color: #8593ab; font-size: .72rem; }
+.ads-chip.on { background: rgba(79,124,255,.18); border-color: #4f7cff; color: #eaf0ff; }
+.ads-chip.on small { color: #a9c0ff; }
+
+.quote-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.quote-head h2 { margin: 0; }
+.quote-live { font-size: .74rem; color: #34d399; }
+
+.q-context { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.q-context span {
+  font-size: .74rem; padding: 4px 9px; border-radius: 999px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.10); color: #b9c6da;
+}
+
+.q-line {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 9px 0; border-bottom: 1px dashed rgba(255,255,255,.10);
+}
+.q-name strong, .q-amt strong { display: block; font-size: .88rem; color: #eef3fa; font-weight: 600; }
+.q-name small, .q-amt small { color: #8593ab; font-size: .74rem; }
+.q-amt { text-align: end; white-space: nowrap; }
+
+.q-rows { margin: 10px 0 0; }
+.q-row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: .84rem; color: #b9c6da; }
+.q-row small { display: block; text-align: end; color: #7d8ba3; font-size: .72rem; }
+
+.q-total {
+  display: flex; justify-content: space-between; gap: 10px; align-items: flex-end;
+  margin-top: 10px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.14);
+}
+.q-total span { display: block; font-size: .76rem; color: #8593ab; }
+.q-total strong { font-size: 1.12rem; color: #ffffff; }
+.q-total .q-usd strong { color: #7ee7b0; }
+
+.q-foot { margin-top: 10px; display: grid; gap: 4px; font-size: .73rem; color: #7d8ba3; line-height: 1.7; }
+
+.quote-actions { display: grid; gap: 8px; margin-top: 16px; }
+.ads-body .btn { border-radius: 10px; font-weight: 600; }
+.ads-body .btn.secondary {
+  background: rgba(255,255,255,.07); color: #e7ecf5; border: 1px solid rgba(255,255,255,.16);
+}
+.ads-body .btn.block { width: 100%; }
+
+#mineSection { margin-top: 18px; }
+.table-wrap { overflow-x: auto; }
+.ads-body table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.ads-body th, .ads-body td { padding: 10px 8px; text-align: start; border-bottom: 1px solid rgba(255,255,255,.08); }
+.ads-body th { color: #8593ab; font-weight: 500; font-size: .76rem; }
+.ads-body td small { display: block; color: #7d8ba3; font-size: .72rem; }
+.mono { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+
+.ad-status {
+  display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: .72rem;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); color: #cbd6e6;
+}
+.ad-status.s-awaiting_payment { background: rgba(245,158,11,.16); border-color: rgba(245,158,11,.4); color: #fcd34d; }
+.ad-status.s-in_review { background: rgba(59,130,246,.16); border-color: rgba(59,130,246,.4); color: #93c5fd; }
+.ad-status.s-active { background: rgba(16,185,129,.16); border-color: rgba(16,185,129,.4); color: #6ee7b7; }
+.ad-status.s-completed { background: rgba(148,163,184,.18); border-color: rgba(148,163,184,.4); color: #cbd5e1; }
+.ad-status.s-canceled, .ad-status.s-rejected { background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.4); color: #fca5a5; }
+
+/* -------------------------------- مودال -------------------------------- */
+
+.ads-overlay {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  padding: 18px; background: rgba(4, 8, 16, .72); backdrop-filter: blur(3px);
+}
+.ads-overlay[hidden] { display: none; }
+.ads-modal {
+  width: min(680px, 100%); max-height: 92vh; overflow: auto;
+  background: #101a2c; border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,.5);
+}
+.ads-modal.small { width: min(420px, 100%); }
+.ads-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.10);
+}
+.ads-modal-body { padding: 16px; }
+.ads-modal-foot {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.10);
+}
+.x-btn {
+  background: transparent; border: 0; color: #a9b6cc; font-size: 1rem; cursor: pointer; padding: 4px 8px;
+}
+
+/* ------------------------------ برگهٔ فاکتور ------------------------------ */
+
+.invoice-paper { background: #ffffff; color: #0f172a; border-radius: 12px; padding: 18px; }
+.invoice-paper .hint { color: #64748b; }
+.paper-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding-bottom: 12px; border-bottom: 2px solid #e2e8f0; }
+.paper-head strong { font-size: 1.02rem; }
+.paper-no { text-align: end; }
+.paper-no span { display: block; font-size: .72rem; color: #64748b; }
+.paper-no strong { font-size: .95rem; font-variant-numeric: tabular-nums; }
+.paper-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 12px 0; font-size: .82rem; }
+.paper-grid > div { display: grid; gap: 2px; }
+.paper-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 6px; }
+.paper-table th, .paper-table td { padding: 8px 6px; border-bottom: 1px solid #e2e8f0; text-align: start; }
+.paper-table th { color: #64748b; font-weight: 500; font-size: .74rem; }
+.paper-table td small { display: block; color: #64748b; font-size: .72rem; }
+.paper-totals { margin-top: 12px; display: grid; gap: 4px; font-size: .84rem; }
+.paper-totals > div { display: flex; justify-content: space-between; gap: 12px; }
+.paper-totals .grand { border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: .96rem; font-weight: 700; }
+.paper-totals .usd { color: #047857; font-weight: 600; }
+.paper-totals .rate { color: #64748b; font-size: .76rem; }
+.paper-note { margin: 14px 0 0; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: .74rem; color: #64748b; line-height: 1.8; }
+
+/* -------------------------------- موبایل -------------------------------- */
+
+@media (max-width: 900px) {
+  .ads-grid { grid-template-columns: 1fr; }
+  .ads-hero { padding-top: 22px; }
+  .paper-grid { grid-template-columns: 1fr; }
+  .field-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .ads-body .panel { padding: 14px; border-radius: 14px; }
+  .ads-chip { flex: 1 1 calc(50% - 8px); }
+  .ads-modal { border-radius: 14px; }
+  .invoice-paper { padding: 14px; }
+}
+
+@media print {
+  body { background: #fff !important; }
+  body > * { display: none !important; }
+  .ads-overlay:not([hidden]) { position: static !important; display: block !important; background: none !important; padding: 0 !important; }
+  .ads-overlay:not([hidden]) .ads-modal { box-shadow: none !important; border: 0 !important; max-height: none !important; width: 100% !important; background: #fff !important; }
+  .ads-modal-head, .ads-modal-foot { display: none !important; }
+  .ads-modal-body { padding: 0 !important; }
+  .invoice-paper { border-radius: 0 !important; padding: 0 !important; }
+}
