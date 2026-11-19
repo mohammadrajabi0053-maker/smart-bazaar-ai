@@ -497,12 +497,13 @@ async function loadMonitor() {
       ? events.slice(0, 40).map((row) => `<tr>
           <td>${esc(time(row.at))}</td>
           <td>${esc(row.type)}</td>
-          <td>${esc(row.severity)}</td>
+          <td>${esc(severityLabel(row.severity))}</td>
           <td>${esc(row.identity || '—')}</td>
           <td>${esc(row.ip || '—')}</td>
           <td>${esc(row.path || '—')}</td>
+          <td>${row.ackAt ? `بررسی‌شده ${esc(time(row.ackAt))}` : `<button class="fin-btn ghost" data-ack-event="${esc(row.id)}" type="button">بررسی شد</button>`}</td>
         </tr>`).join('')
-      : '<tr><td colspan="6">رویدادی در این بازه ثبت نشده است.</td></tr>';
+      : '<tr><td colspan="7">رویدادی در این بازه ثبت نشده است.</td></tr>';
   } catch (err) {
     toast(`خطا در گزارش امنیتی: ${err.message}`, 'err');
   }
@@ -512,7 +513,7 @@ async function loadAlerts() {
   try {
     const data = await api('/api/finance/monitor/alerts');
     $('alertEnabled').checked = Boolean(data.config.enabled);
-    $('alertSeverity').value = data.config.minSeverity || 'warning';
+    $('alertSeverity').value = data.config.minSeverity || 'medium';
     $('alertWebhook').value = data.config.webhookUrl || '';
     const body = $('alertTable').querySelector('tbody');
     const rows = Array.isArray(data.alerts) ? data.alerts : [];
@@ -520,10 +521,11 @@ async function loadAlerts() {
       ? rows.map((row) => `<tr>
           <td>${esc(time(row.at))}</td>
           <td>${esc(row.title || row.type || '—')}</td>
-          <td>${esc(row.severity || '—')}</td>
+          <td>${esc(severityLabel(row.severity))}</td>
           <td>${row.delivered ? 'ارسال شد' : esc(row.error || 'فقط داخلی')}</td>
+          <td>${row.ackAt ? `بررسی‌شده ${esc(time(row.ackAt))}` : `<button class="fin-btn ghost" data-ack-alert="${esc(row.id)}" type="button">بررسی شد</button>`}</td>
         </tr>`).join('')
-      : '<tr><td colspan="4">هشداری ثبت نشده است.</td></tr>';
+      : '<tr><td colspan="5">هشداری ثبت نشده است.</td></tr>';
   } catch (err) {
     toast(`خطا در هشدارها: ${err.message}`, 'err');
   }
@@ -624,6 +626,39 @@ $('revokeOthersBtn').addEventListener('click', revokeOthers);
 $('recoveryGenBtn').addEventListener('click', generateRecovery);
 $('passkeyAddBtn').addEventListener('click', addPasskey);
 $('monApply').addEventListener('click', loadMonitor);
+/* سطوح شدت — نگاشت فارسی برای نمایش */
+const SEVERITY_LABELS = { info: 'اطلاع‌رسانی', medium: 'متوسط', high: 'بالا', critical: 'بحرانی' };
+function severityLabel(value) {
+  return SEVERITY_LABELS[value] || SEVERITY_LABELS.medium;
+}
+
+async function ackEvent(rowId) {
+  try {
+    await api(`/api/finance/monitor/events/${encodeURIComponent(rowId)}/ack`, { method: 'POST', body: {} });
+    toast('رویداد به‌عنوان بررسی‌شده ثبت شد', 'ok');
+    await loadMonitor();
+  } catch (err) {
+    toast(`ثبت بررسی ناموفق: ${err.message}`, 'err');
+  }
+}
+
+async function ackAlertRow(rowId) {
+  try {
+    await api(`/api/finance/monitor/alerts/${encodeURIComponent(rowId)}/ack`, { method: 'POST', body: {} });
+    toast('هشدار بررسی شد', 'ok');
+    await loadAlerts();
+  } catch (err) {
+    toast(`ثبت بررسی ناموفق: ${err.message}`, 'err');
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const eventBtn = event.target.closest('[data-ack-event]');
+  if (eventBtn) return ackEvent(eventBtn.dataset.ackEvent);
+  const alertBtn = event.target.closest('[data-ack-alert]');
+  if (alertBtn) return ackAlertRow(alertBtn.dataset.ackAlert);
+});
+
 $('alertSaveBtn').addEventListener('click', saveAlerts);
 $('alertTestBtn').addEventListener('click', testAlert);
 $('envSwitchBtn').addEventListener('click', switchEnvironment);
