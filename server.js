@@ -29,6 +29,15 @@ import {
   publicUser, hashPassword, verifyPassword, parseCookies,
 } from './src/auth.js';
 import { seedIfEmpty, ensureSeedImages } from './src/seed.js';
+import { seedDirectory } from './src/seed-directory.js';
+import {
+  ACTIVITY_OUTCOMES, ACTIVITY_TYPES, AD_FORMATS, AD_NETWORKS, CONSENT_STATUSES, LEAD_STATUSES,
+  VERIFY_STATUSES, DirectoryError, activityView, addActivity, applyDeletion, businessView, canAdvertise,
+  catalogPayload, completeActivity, consentView, crmStats, csvForBusinesses, directoryStats, dueReminders,
+  filterBusinesses, filterLeads, findDuplicate, findLeadDuplicate, isCountry, isIndustry, isSource, isType,
+  leadView, logAudit, normalizeBusinessInput, normalizeLeadInput, recordOptOut, requestDeletion, setConsent,
+} from './src/directory.js';
+import { maskPhone, normalizePhone, phoneKey, requestOtp, verifyOtp } from './src/otp.js';
 import {
   localDescription, suggestPrice, localKeywords, localAssistant, sellerInsights,
   smartSearch, suggestQueries, providerComplete, providerConfig, normalize,
@@ -114,17 +123,45 @@ function orderView(order) {
     status: order.status,
     items: order.items,
     subtotal: order.subtotal,
+    discount: Number(order.discount || 0),
+    discountCode: order.discountCode || null,
     shippingCost: order.shippingCost,
     total: order.total,
     shipping: order.shipping,
     note: order.note,
     storeName: order.storeName,
     customerName: order.customerName,
+    payment: order.payment || { method: null, status: 'unpaid' },
+    tracking: order.tracking || null,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
     history: order.history || [],
     allowedStatuses: STATUS_FLOW[order.status] || [],
   };
+}
+
+// نمای فروشنده/مدیر: کمیسیون و سهم فروشنده فقط برای همین نقش‌ها
+function internalOrderView(order) {
+  return {
+    ...orderView(order),
+    commission: Number(order.commission || 0),
+    commissionRate: Number(order.commissionRate || 0),
+    sellerPayout: Number(order.sellerPayout ?? order.total),
+  };
+}
+
+// تخفیف سمت سرور: کد، سقف مبلغ و اعتبار بررسی می‌شود
+function resolveDiscount(db, rawCode, subtotal) {
+  const code = String(rawCode || '').trim().toUpperCase().slice(0, 24);
+  if (!code) return { code: null, amount: 0, reason: null };
+  const row = (db.discounts || []).find((d) => d.code === code && d.active !== false);
+  if (!row) return { code, amount: 0, reason: 'discount_invalid' };
+  let amount = row.type === 'percent'
+    ? Math.round((subtotal * Number(row.value || 0)) / 100)
+    : Math.round(Number(row.value || 0));
+  if (row.maxAmount) amount = Math.min(amount, Number(row.maxAmount));
+  amount = Math.max(0, Math.min(amount, subtotal));
+  return { code, amount, reason: null };
 }
 
 /* ------------------------------- محدودکننده ------------------------------- */
@@ -250,6 +287,7 @@ export function createApp() {
     ensureFinance(db);
     ensureOwnerFlag(db);
     seedDemoLedger(db);
+    seedDirectory(db);
     saveDbSoon();
   }
 
@@ -604,6 +642,25 @@ export function createApp() {
       lines.push({ product, qty });
     }
 
+    const cartSubtotal = lines.reduce((s, line) => s + line.product.price * line.qty, 0);
+    const discount = resolveDiscount(db, req.body?.discountCode, cartSubtotal);
+    if (discount.reason) return res.status(400).json({ error: discount.reason });
+
+    // جلوگیری از ثبت سفارش تکراری با کلید درخواست
+    const requestId = clean(req.body?.requestId, 40);
+    if (requestId) {
+      const existing = db.orders.find((o) => o.requestId === requestId && o.customerId === req.user.id);
+      if (existing) {
+        const group = db.orders.filter((o) => o.groupId === existing.groupId);
+        return res.json({
+          groupId: existing.groupId,
+          orders: group.map(orderView),
+          total: group.reduce((s, o) => s + o.total, 0),
+          duplicate: true,
+        });
+      }
+    }
+
     const groupId = id();
     const seqBase = Number(db.settings?.orderSeq || 100000);
     let seq = seqBase;
@@ -618,7 +675,12 @@ export function createApp() {
     for (const [sellerId, sellerLines] of bySeller) {
       const seller = db.users.find((u) => u.id === sellerId);
       const subtotal = sellerLines.reduce((s, line) => s + line.product.price * line.qty, 0);
+      const sellerDiscount = cartSubtotal > 0 ? Math.round((discount.amount * subtotal) / cartSubtotal) : 0;
       const shippingCost = subtotal >= FREE_SHIPPING_FROM ? 0 : Number(db.settings?.shippingCost ?? 45000);
+      const commissionRate = Number(db.settings?.commissionRate ?? 0.07);
+      const commission = Math.round((subtotal - sellerDiscount) * commissionRate);
+      const total = subtotal - sellerDiscount + shippingCost;
+      const sellerPayout = subtotal - sellerDiscount - commission + shippingCost;
       seq += 1;
       const order = {
         id: id(),
@@ -636,8 +698,16 @@ export function createApp() {
           image: line.product.image || null,
         })),
         subtotal,
+        discount: sellerDiscount,
+        discountCode: discount.code,
         shippingCost,
-        total: subtotal + shippingCost,
+        total,
+        commission,
+        commissionRate,
+        sellerPayout,
+        requestId: requestId || null,
+        payment: { method: null, status: 'unpaid', at: null },
+        tracking: null,
         status: 'pending',
         shipping,
         note: cleanMultiline(req.body?.note, 400),
@@ -660,6 +730,13 @@ export function createApp() {
       groupId,
       orders: created.map(orderView),
       total: created.reduce((s, o) => s + o.total, 0),
+      cart: {
+        subtotal: cartSubtotal,
+        discount: discount.amount,
+        discountCode: discount.code,
+        shipping: created.reduce((s, o) => s + Number(o.shippingCost || 0), 0),
+        total: created.reduce((s, o) => s + Number(o.total || 0), 0),
+      },
     });
   });
 
@@ -793,7 +870,7 @@ export function createApp() {
     if (ORDER_STATUSES.includes(status)) orders = orders.filter((o) => o.status === status);
     orders = orders
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-      .map(orderView);
+      .map(internalOrderView);
     res.json({ orders });
   });
 
@@ -890,7 +967,7 @@ export function createApp() {
     const orders = db.orders
       .filter((o) => !status || o.status === status)
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-      .map(orderView);
+      .map(internalOrderView);
     res.json({ orders });
   });
 
