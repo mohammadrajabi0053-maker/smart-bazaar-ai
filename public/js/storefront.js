@@ -303,6 +303,103 @@ async function submitAuth(event) {
   }
 }
 
+/* ---------- ورود با Passkey و کد بازیابی (فاز چهارم — مرحله ششم) ---------- */
+const b64urlToBytes = (value) => {
+  const base = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
+  const pad = base + '='.repeat((4 - (base.length % 4)) % 4);
+  const raw = atob(pad);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+};
+
+const bytesToB64url = (buffer) => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+function finishLogin(user) {
+  state.user = user;
+  renderAccount();
+  closeOverlay('authModal');
+  toast(`${t('saved')} ${user.name}`, 'ok');
+  const next = new URLSearchParams(location.search).get('next');
+  if (next && next.startsWith('/') && !next.startsWith('//')) location.href = next;
+  else if (user.role === 'seller') location.href = '/seller';
+  else if (user.role === 'admin') location.href = '/admin';
+  else loadProducts(true);
+}
+
+async function passkeyLogin() {
+  const hint = $('#passkeyHint');
+  const email = String($('#auEmail')?.value || '').trim().toLowerCase();
+  if (!email) {
+    hint.textContent = 'ایمیل حساب را وارد کنید.';
+    return;
+  }
+  if (!window.PublicKeyCredential || !navigator.credentials) {
+    hint.textContent = 'این مرورگر از Passkey پشتیبانی نمی‌کند؛ از رمز عبور یا کد بازیابی استفاده کنید.';
+    return;
+  }
+  try {
+    hint.textContent = t('loading');
+    const options = await api('/api/auth/webauthn/login/options', { method: 'POST', body: { email } });
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: b64urlToBytes(options.challenge),
+        rpId: options.rpId,
+        timeout: options.timeout || 60000,
+        userVerification: options.userVerification || 'preferred',
+        allowCredentials: (options.allowCredentials || []).map((item) => ({
+          type: item.type || 'public-key',
+          id: b64urlToBytes(item.id),
+        })),
+      },
+    });
+    if (!assertion) throw new Error('ورود لغو شد.');
+    const data = await api('/api/auth/webauthn/login/verify', {
+      method: 'POST',
+      body: {
+        email,
+        challenge: options.challenge,
+        credential: {
+          id: assertion.id,
+          response: {
+            clientDataJSON: bytesToB64url(assertion.response.clientDataJSON),
+            authenticatorData: bytesToB64url(assertion.response.authenticatorData),
+            signature: bytesToB64url(assertion.response.signature),
+            userHandle: assertion.response.userHandle ? bytesToB64url(assertion.response.userHandle) : undefined,
+          },
+        },
+      },
+    });
+    hint.textContent = '';
+    finishLogin(data.user);
+  } catch (err) {
+    hint.textContent = err?.message || 'ورود با Passkey ناموفق بود.';
+  }
+}
+
+async function recoveryLogin() {
+  const hint = $('#passkeyHint');
+  const email = String($('#recEmail')?.value || $('#auEmail')?.value || '').trim().toLowerCase();
+  const code = String($('#recCode')?.value || '').trim();
+  if (!email || !code) {
+    hint.textContent = 'ایمیل و کد بازیابی لازم است.';
+    return;
+  }
+  try {
+    hint.textContent = t('loading');
+    const data = await api('/api/auth/recovery/login', { method: 'POST', body: { email, code } });
+    hint.textContent = '';
+    finishLogin(data.user);
+  } catch (err) {
+    hint.textContent = err?.message || 'کد بازیابی نامعتبر یا مصرف‌شده است.';
+  }
+}
+
 async function logout() {
   try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
   state.user = null;
@@ -583,6 +680,8 @@ function bindUi() {
   $('#tabLogin').addEventListener('click', () => { state.authMode = 'login'; applyAuthMode(); });
   $('#tabRegister').addEventListener('click', () => { state.authMode = 'register'; applyAuthMode(); });
   $('#authForm').addEventListener('submit', submitAuth);
+  $('#passkeyLoginBtn')?.addEventListener('click', passkeyLogin);
+  $('#recoveryLoginBtn')?.addEventListener('click', recoveryLogin);
   $('#checkoutForm').addEventListener('submit', submitCheckout);
 
   $('#aiBtn').addEventListener('click', () => { openDrawer('aiDrawer'); renderAi(); });
