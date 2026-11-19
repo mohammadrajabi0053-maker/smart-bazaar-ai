@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="مرکز امنیت هوشمند بازار — فقط مدیر اصلی">
+<title>مرکز امنیت هوشمند بازار | بازار هوشمند</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/finance.css">
+</head>
+<body class="fin-body">
+
+<header class="site-header fin-header">
+  <div class="container header-row">
+    <a class="brand" href="/">
+      <span class="logo">🛡️</span>
+      <span class="name">بازار هوشمند</span>
+    </a>
+    <div class="header-actions">
+      <a class="icon-btn" href="/">فروشگاه</a>
+      <a class="icon-btn" href="/finance">مالی</a>
+      <a class="icon-btn" href="/admin">مدیریت</a>
+      <select id="langSelect" class="lang-select" aria-label="زبان">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+      <button class="icon-btn" id="logoutBtn" type="button">🚪 خروج</button>
+    </div>
+  </div>
+</header>
+
+<main class="container fin-main">
+
+  <section class="fin-hero">
+    <div class="fin-hero-text">
+      <h1>مرکز امنیت هوشمند بازار</h1>
+      <p>پشتیبان‌گیری رمزگذاری‌شده، جداسازی محیط آزمایشی و واقعی، مدیریت نشست‌ها، کلید امنیتی/Passkey و نظارت امنیتی — همه در سمت سرور و فقط برای مدیر اصلی.</p>
+    </div>
+    <div class="fin-hero-badges">
+      <span class="fin-badge owner">👑 مدیر اصلی</span>
+      <span class="fin-badge off" id="paymentsBadge">🔒 پرداخت واقعی غیرفعال</span>
+      <span class="fin-badge off">🏦 برداشت واقعی غیرفعال</span>
+      <span class="fin-badge" id="envBadge">🧪 —</span>
+    </div>
+  </section>
+
+  <nav class="fin-tabs" role="tablist" aria-label="بخش‌های امنیت">
+    <button class="fin-tab active" data-tab="posture" role="tab" aria-selected="true" type="button">وضعیت امنیتی</button>
+    <button class="fin-tab" data-tab="backup" role="tab" aria-selected="false" type="button">پشتیبان و بازیابی</button>
+    <button class="fin-tab" data-tab="sessions" role="tab" aria-selected="false" type="button">نشست‌ها و کد بازیابی</button>
+    <button class="fin-tab" data-tab="passkey" role="tab" aria-selected="false" type="button">کلید امنیتی / Passkey</button>
+    <button class="fin-tab" data-tab="monitor" role="tab" aria-selected="false" type="button">نظارت و هشدار</button>
+  </nav>
+
+  <!-- ================= وضعیت امنیتی ================= -->
+  <section class="fin-panel active" id="panel-posture">
+    <div class="fin-cards" id="postureCards">
+      <div class="fin-card"><span class="fin-card-label">احراز هویت دومرحله‌ای</span><strong class="fin-card-value" data-k="twoFactor">—</strong></div>
+      <div class="fin-card"><span class="fin-card-label">کلیدهای امنیتی ثبت‌شده</span><strong class="fin-card-value" data-k="passkeys">—</strong></div>
+      <div class="fin-card"><span class="fin-card-label">نشست‌های فعال</span><strong class="fin-card-value" data-k="sessions">—</strong></div>
+      <div class="fin-card"><span class="fin-card-label">آخرین پشتیبان</span><strong class="fin-card-value" data-k="backup">—</strong></div>
+      <div class="fin-card"><span class="fin-card-label">رویدادهای امنیتی</span><strong class="fin-card-value" data-k="events">—</strong></div>
+      <div class="fin-card"><span class="fin-card-label">هشدارهای بحرانی</span><strong class="fin-card-value" data-k="critical">—</strong></div>
+    </div>
+
+    <div class="fin-block">
+      <h2>محیط فعال (آزمایشی / واقعی)</h2>
+      <p class="fin-note" id="envNote">در حال بارگذاری…</p>
+      <div class="fin-row">
+        <label class="fin-field"><span>محیط</span>
+          <select id="envMode">
+            <option value="demo">آزمایشی (Demo)</option>
+            <option value="live">واقعی (Live)</option>
+          </select>
+        </label>
+        <button class="fin-btn" id="envSwitchBtn" type="button">تغییر محیط</button>
+      </div>
+      <p class="fin-note">تغییر محیط نیازمند رمز عبور و کد Authenticator است. دادهٔ آزمایشی با نشانگر demo ذخیره می‌شود و در محیط واقعی در گزارش‌ها و محاسبات دیده نمی‌شود.</p>
+    </div>
+
+    <div class="fin-block">
+      <h2>آخرین رویدادهای حساس</h2>
+      <div class="fin-table-wrap"><table class="fin-table" id="sensitiveTable"><thead><tr><th>زمان</th><th>اقدام</th><th>هدف</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ================= پشتیبان ================= -->
+  <section class="fin-panel" id="panel-backup">
+    <div class="fin-block">
+      <h2>پشتیبان‌گیری رمزگذاری‌شده</h2>
+      <p class="fin-note" id="backupEncryption">—</p>
+      <div class="fin-row">
+        <label class="fin-field"><span>دلیل پشتیبان</span><input id="backupReason" maxlength="40" value="manual"></label>
+        <label class="fin-check"><input type="checkbox" id="backupSecrets"> <span>شامل کلیدها و رازهای رمزگذاری‌شده (نیازمند ۲FA)</span></label>
+        <button class="fin-btn" id="backupCreateBtn" type="button">ساخت پشتیبان</button>
+      </div>
+      <p class="fin-note" id="backupLimit">—</p>
+    </div>
+
+    <div class="fin-block">
+      <h2>زمان‌بندی خودکار</h2>
+      <div class="fin-row">
+        <label class="fin-check"><input type="checkbox" id="schedEnabled"> <span>فعال</span></label>
+        <label class="fin-field"><span>فاصله (ساعت)</span><input id="schedInterval" type="number" min="1" max="168" value="24"></label>
+        <label class="fin-field"><span>نگهداری (نسخه)</span><input id="schedRetention" type="number" min="1" max="30" value="7"></label>
+        <button class="fin-btn" id="schedSaveBtn" type="button">ذخیره زمان‌بندی</button>
+        <button class="fin-btn ghost" id="backupNowBtn" type="button">اجرای فوری</button>
+      </div>
+    </div>
+
+    <div class="fin-block">
+      <h2>تاریخچه پشتیبان‌ها</h2>
+      <div class="fin-table-wrap"><table class="fin-table" id="backupTable">
+        <thead><tr><th>زمان</th><th>دلیل</th><th>حجم</th><th>اثر انگشت</th><th>عملیات</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="fin-block">
+      <h2>بازیابی اطلاعات</h2>
+      <p class="fin-note">ابتدا پیش‌نمایش (بدون تغییر داده) اجرا می‌شود. بازیابی واقعی نیازمند تأیید دومرحله‌ای و عبارت <code>RESTORE</code> است و پیش از جای‌گزینی، یک پشتیبان ایمنی خودکار می‌سازد.</p>
+      <div class="fin-row">
+        <label class="fin-field"><span>شناسه پشتیبان</span><input id="restoreId" placeholder="bk_..."></label>
+        <button class="fin-btn ghost" id="restorePreviewBtn" type="button">پیش‌نمایش</button>
+        <label class="fin-field"><span>عبارت تأیید</span><input id="restoreConfirm" placeholder="RESTORE"></label>
+        <button class="fin-btn danger" id="restoreApplyBtn" type="button">بازیابی واقعی</button>
+      </div>
+      <pre class="fin-pre" id="restoreOut">نتیجه در اینجا نمایش داده می‌شود.</pre>
+    </div>
+  </section>
+
+  <!-- ================= نشست‌ها ================= -->
+  <section class="fin-panel" id="panel-sessions">
+    <div class="fin-block">
+      <h2>نشست‌های فعال</h2>
+      <div class="fin-row">
+        <button class="fin-btn ghost" id="sessionsRefresh" type="button">به‌روزرسانی</button>
+        <button class="fin-btn danger" id="revokeOthersBtn" type="button">خروج از سایر دستگاه‌ها</button>
+      </div>
+      <div class="fin-table-wrap"><table class="fin-table" id="sessionsTable">
+        <thead><tr><th>دستگاه</th><th>IP</th><th>ورود</th><th>آخرین فعالیت</th><th>وضعیت</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="fin-block">
+      <h2>کدهای بازیابی اضطراری</h2>
+      <p class="fin-note" id="recoveryStatus">—</p>
+      <div class="fin-row">
+        <button class="fin-btn" id="recoveryGenBtn" type="button">ساخت کدهای جدید (۲FA)</button>
+      </div>
+      <div class="fin-codes" id="recoveryCodes"></div>
+      <p class="fin-note">هر کد فقط یک‌بار قابل استفاده است. آن‌ها را در جای امن نگه دارید؛ پس از بستن این صفحه دیگر نمایش داده نمی‌شوند.</p>
+    </div>
+  </section>
+
+  <!-- ================= Passkey ================= -->
+  <section class="fin-panel" id="panel-passkey">
+    <div class="fin-block">
+      <h2>کلید امنیتی سخت‌افزاری و Passkey</h2>
+      <p class="fin-note">ورود با Passkey به‌عنوان مسیر جایگزین اضافه می‌شود و ورود با رمز عبور و ۲FA کاملاً حفظ می‌شود. پشتیبانی به مرورگر و دستگاه شما بستگی دارد.</p>
+      <div class="fin-row">
+        <label class="fin-field"><span>برچسب دستگاه</span><input id="passkeyLabel" maxlength="40" placeholder="YubiKey / Touch ID"></label>
+        <button class="fin-btn" id="passkeyAddBtn" type="button">افزودن Passkey</button>
+      </div>
+      <div class="fin-table-wrap"><table class="fin-table" id="passkeyTable">
+        <thead><tr><th>برچسب</th><th>ثبت</th><th>آخرین استفاده</th><th>شمارنده</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ================= نظارت ================= -->
+  <section class="fin-panel" id="panel-monitor">
+    <div class="fin-block">
+      <h2>فیلتر گزارش امنیتی</h2>
+      <div class="fin-row">
+        <label class="fin-field"><span>از تاریخ</span><input id="monFrom" type="date"></label>
+        <label class="fin-field"><span>تا تاریخ</span><input id="monTo" type="date"></label>
+        <label class="fin-field"><span>شدت</span>
+          <select id="monSeverity"><option value="">همه</option><option value="info">info</option><option value="warning">warning</option><option value="critical">critical</option></select>
+        </label>
+        <label class="fin-field"><span>جست‌وجو</span><input id="monQ" placeholder="IP، ایمیل، نوع رویداد"></label>
+        <button class="fin-btn" id="monApply" type="button">اعمال فیلتر</button>
+      </div>
+    </div>
+
+    <div class="fin-block">
+      <h2>تلاش‌های مشکوک</h2>
+      <div class="fin-table-wrap"><table class="fin-table" id="suspiciousTable"><thead><tr><th>هدف</th><th>تعداد تلاش</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="fin-block">
+      <h2>رویدادهای امنیتی</h2>
+      <div class="fin-table-wrap"><table class="fin-table" id="eventsTable">
+        <thead><tr><th>زمان</th><th>نوع</th><th>شدت</th><th>هویت</th><th>IP</th><th>مسیر</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="fin-block">
+      <h2>کانال هشدار مالک</h2>
+      <div class="fin-row">
+        <label class="fin-check"><input type="checkbox" id="alertEnabled"> <span>فعال</span></label>
+        <label class="fin-field"><span>حداقل شدت</span>
+          <select id="alertSeverity"><option value="info">info</option><option value="warning">warning</option><option value="critical">critical</option></select>
+        </label>
+        <label class="fin-field grow"><span>Webhook (اختیاری)</span><input id="alertWebhook" placeholder="https://example.com/hook"></label>
+        <button class="fin-btn" id="alertSaveBtn" type="button">ذخیره</button>
+        <button class="fin-btn ghost" id="alertTestBtn" type="button">آزمون کانال</button>
+      </div>
+      <p class="fin-note">ارسال هشدار به سرویس خارجی نیازمند آدرس معتبر و دسترسی شبکه است؛ بدون آن، هشدارها فقط در همین داشبورد ثبت و نمایش داده می‌شوند.</p>
+      <div class="fin-table-wrap"><table class="fin-table" id="alertTable"><thead><tr><th>زمان</th><th>عنوان</th><th>شدت</th><th>وضعیت ارسال</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="fin-block" id="secondFactorBox">
+    <h2>تأیید دومرحله‌ای (برای عملیات حساس)</h2>
+    <div class="fin-row">
+      <label class="fin-field"><span>رمز عبور مدیر اصلی</span><input id="sfPassword" type="password" autocomplete="current-password"></label>
+      <label class="fin-field"><span>کد Authenticator</span><input id="sfCode" inputmode="numeric" maxlength="6" placeholder="123456"></label>
+    </div>
+    <p class="fin-note">این مقادیر فقط در همان درخواست استفاده می‌شوند و ذخیره نمی‌شوند.</p>
+  </section>
+
+</main>
+
+<script type="module" src="/js/security.js"></script>
+</body>
+</html>
