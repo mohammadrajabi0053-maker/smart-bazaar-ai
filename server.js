@@ -6,6 +6,10 @@ import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 import { phaseById, phaseCatalog } from './src/phases.js';
+import {
+  CSRF_COOKIE, csrfGuard, csrfIssue, clearLoginFailures, loginStatus, originGuard,
+  registerLoginFailure, securityHeaders,
+} from './src/security.js';
 
 import {
   CATEGORIES, LANGS, ORDER_STATUSES, STATUS_FLOW, categoryLabel, isValidCategory,
@@ -269,11 +273,15 @@ export function createApp() {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
+  app.use(securityHeaders);
 
   app.use((req, _res, next) => {
     req.cookies = parseCookies(req.headers.cookie || '');
     next();
   });
+  app.use(csrfIssue);
+  app.use(originGuard);
+  app.use(csrfGuard);
   app.use(express.json({ limit: '4mb' }));
   app.use(attachUser);
 
@@ -384,6 +392,19 @@ export function createApp() {
   });
 
   /* --------------------------------- احراز هویت --------------------------------- */
+
+  app.get('/api/csrf', (req, res) => {
+    if (req.csrfToken) return res.json({ token: req.csrfToken });
+    const token = crypto.randomBytes(32).toString('base64url');
+    res.cookie(CSRF_COOKIE, token, {
+      httpOnly: false,
+      sameSite: 'lax',
+      secure: Boolean(req.secure),
+      path: '/',
+      maxAge: 12 * 60 * 60 * 1000,
+    });
+    return res.json({ token });
+  });
 
   app.post('/api/auth/register', authLimiter, (req, res) => {
     const db = getDb();
