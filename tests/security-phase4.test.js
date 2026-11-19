@@ -534,8 +534,11 @@ test('دسترسی غیرمالک به بخش‌های امنیتی و حفظ ق
   assert.equal(ads.status, 200);
   assert.equal(ads.json.publishing?.enabled, false, 'انتشار واقعی تبلیغات باید غیرفعال بماند');
   assert.equal(ads.json.payments?.enabled, false, 'پرداخت واقعی باید غیرفعال بماند');
-  const businesses = await anon('/api/businesses');
-  assert.equal(businesses.status, 200, 'بانک اطلاعات کسب‌وکارها باید سالم بماند');
+  const businessesAnon = await anon('/api/directory/businesses');
+  assert.ok([401, 403].includes(businessesAnon.status), 'بانک اطلاعات باید پشت کنترل دسترسی بماند');
+  const businesses = await owner('/api/directory/businesses');
+  assert.equal(businesses.status, 200, 'بانک اطلاعات کسب‌وکارها برای مالک باید سالم بماند');
+  assert.ok(Array.isArray(businesses.json.businesses), 'فهرست کسب‌وکارها باید برگردد');
   const ownerOverview = await owner('/api/finance/overview');
   assert.equal(ownerOverview.status, 200);
   assert.ok(ownerOverview.json.wallet, 'کیف پول مدیریتی باید سالم بماند');
