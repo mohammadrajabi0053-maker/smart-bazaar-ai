@@ -13,6 +13,7 @@ const EMPTY = () => ({
   orders: [],
   reviews: [],
   assistantLogs: [],
+  adCampaigns: [],
   settings: { createdAt: new Date().toISOString() },
 });
 

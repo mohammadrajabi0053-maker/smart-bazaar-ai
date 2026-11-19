@@ -9,6 +9,9 @@ import {
   CATEGORIES, LANGS, ORDER_STATUSES, STATUS_FLOW, categoryLabel, isValidCategory,
 } from './src/catalog.js';
 import {
+  AdInputError, adOptions, adStats, buildQuote, campaignView, canTransition, invoiceFor, nextInvoiceNo,
+} from './src/ads.js';
+import {
   getDb, saveDb, saveDbSoon, flushDb, id, ensureUploadDir, UPLOAD_DIR,
 } from './src/store.js';
 import {
@@ -893,6 +896,158 @@ export function createApp() {
     res.json({ insights: sellerInsights(products, orders), engine: 'local' });
   });
 
+  /* ------------------------------ مرکز تبلیغات ------------------------------ */
+
+  const adDay = 864e5;
+  const toIsoDay = (value) => {
+    const d = value ? new Date(value) : new Date();
+    if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+    return d.toISOString().slice(0, 10);
+  };
+  const plusDays = (isoDay, days) =>
+    new Date(new Date(`${isoDay}T00:00:00Z`).getTime() + days * adDay).toISOString().slice(0, 10);
+  const adFail = (res, err) => {
+    if (err instanceof AdInputError) return res.status(err.status).json({ error: err.code });
+    throw err;
+  };
+
+  app.get('/api/ads/options', (_req, res) => {
+    res.json(adOptions(getDb()));
+  });
+
+  app.post('/api/ads/quote', (req, res) => {
+    try {
+      res.json({ quote: buildQuote(req.body || {}, getDb()) });
+    } catch (err) {
+      adFail(res, err);
+    }
+  });
+
+  app.get('/api/ads/campaigns', requireAuth, (req, res) => {
+    const db = getDb();
+    const campaigns = db.adCampaigns
+      .filter((c) => req.user.role === 'admin' || c.userId === req.user.id)
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .map(campaignView);
+    res.json({ campaigns, publishingEnabled: false, paymentsEnabled: false });
+  });
+
+  app.post('/api/ads/campaigns', requireAuth, (req, res) => {
+    const db = getDb();
+    const body = req.body || {};
+    const title = clean(body.title, 120);
+    if (title.length < 3) return res.status(400).json({ error: 'title_required' });
+    const description = cleanMultiline(body.description, 1000);
+
+    let quote;
+    try {
+      quote = buildQuote(body, db);
+    } catch (err) {
+      return adFail(res, err);
+    }
+
+    const startDate = toIsoDay(body.startDate);
+    const endDate = plusDays(startDate, quote.durationDays);
+    const stamp = new Date().toISOString();
+    const campaign = {
+      id: id(),
+      invoiceNo: nextInvoiceNo(db),
+      userId: req.user.id,
+      ownerName: req.user.name || '',
+      ownerEmail: req.user.email || '',
+      title,
+      description,
+      country: quote.country.code,
+      countryName: quote.country.name,
+      currency: quote.currency,
+      media: quote.lines.map((line) => line.media),
+      placement: quote.placement.code,
+      creative: quote.creative.code,
+      durationDays: quote.durationDays,
+      startDate,
+      endDate,
+      rate: quote.rate,
+      rateSource: quote.rateBase,
+      totalLocal: quote.totalLocal,
+      totalUsd: quote.totalUsd,
+      breakdown: quote,
+      status: 'awaiting_payment',
+      paymentStatus: 'disabled',
+      paymentEnabled: false,
+      publishingEnabled: false,
+      statusHistory: [
+        { status: 'awaiting_payment', at: stamp, by: req.user.id, note: 'online_payment_disabled' },
+      ],
+      createdAt: stamp,
+      updatedAt: stamp,
+    };
+    db.adCampaigns.push(campaign);
+    saveDbSoon();
+    res.status(201).json({ campaign: campaignView(campaign), invoice: invoiceFor(campaign) });
+  });
+
+  app.get('/api/ads/campaigns/:id', requireAuth, (req, res) => {
+    const db = getDb();
+    const campaign = db.adCampaigns.find((c) => c.id === req.params.id);
+    if (!campaign) return res.status(404).json({ error: 'not_found' });
+    if (campaign.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    res.json({ campaign: campaignView(campaign), invoice: invoiceFor(campaign) });
+  });
+
+  app.post('/api/ads/campaigns/:id/cancel', requireAuth, (req, res) => {
+    const db = getDb();
+    const campaign = db.adCampaigns.find((c) => c.id === req.params.id);
+    if (!campaign) return res.status(404).json({ error: 'not_found' });
+    if (campaign.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    if (!canTransition(campaign.status, 'canceled')) {
+      return res.status(409).json({ error: 'status_locked', status: campaign.status });
+    }
+    campaign.status = 'canceled';
+    campaign.paymentStatus = 'disabled';
+    campaign.updatedAt = new Date().toISOString();
+    campaign.statusHistory.push({
+      status: 'canceled', at: campaign.updatedAt, by: req.user.id, note: 'canceled_by_user',
+    });
+    saveDbSoon();
+    res.json({ campaign: campaignView(campaign), invoice: invoiceFor(campaign) });
+  });
+
+  app.get('/api/admin/ads/campaigns', requireRole('admin'), (req, res) => {
+    const db = getDb();
+    const status = clean(req.query.status, 24);
+    const campaigns = db.adCampaigns
+      .filter((c) => !status || c.status === status)
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .map(campaignView);
+    res.json({ campaigns, stats: adStats(db.adCampaigns) });
+  });
+
+  app.get('/api/admin/ads/stats', requireRole('admin'), (_req, res) => {
+    res.json(adStats(getDb().adCampaigns));
+  });
+
+  app.patch('/api/admin/ads/campaigns/:id', requireRole('admin'), (req, res) => {
+    const db = getDb();
+    const campaign = db.adCampaigns.find((c) => c.id === req.params.id);
+    if (!campaign) return res.status(404).json({ error: 'not_found' });
+    const next = clean(req.body?.status, 24);
+    if (!next) return res.status(400).json({ error: 'status_required' });
+    if (!canTransition(campaign.status, next)) {
+      return res.status(409).json({ error: 'status_transition_invalid', from: campaign.status, to: next });
+    }
+    campaign.status = next;
+    campaign.updatedAt = new Date().toISOString();
+    campaign.statusHistory.push({
+      status: next, at: campaign.updatedAt, by: req.user.id, note: clean(req.body?.note, 160) || 'admin_update',
+    });
+    saveDbSoon();
+    res.json({ campaign: campaignView(campaign), stats: adStats(db.adCampaigns) });
+  });
+
   /* --------------------------------- فایل‌ها --------------------------------- */
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
@@ -900,6 +1055,7 @@ export function createApp() {
   app.use(express.static(PUBLIC_DIR, { maxAge: '1h', extensions: ['html'] }));
   app.get('/seller', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'seller.html')));
   app.get('/admin', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
+  app.get('/ads', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'ads.html')));
 
   app.use((req, res) => {
     if (req.accepts('html')) return res.status(404).sendFile(path.join(PUBLIC_DIR, '404.html'));
