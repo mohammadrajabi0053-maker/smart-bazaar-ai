@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حریم خصوصی و لغو دریافت تبلیغات | بازار هوشمند</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏪</text></svg>">
+<link rel="stylesheet" href="/css/p3.css">
+</head>
+<body class="p3">
+
+<header class="p3-header">
+  <div class="p3-wrap p3-header__row">
+    <a class="p3-brand" href="/"><span class="logo">🏪</span><span data-i18n="brand">بازار هوشمند</span></a>
+    <nav class="p3-nav">
+      <a href="/" data-i18n="nav_store">فروشگاه</a>
+      <a href="/account" data-i18n="nav_account">حساب من</a>
+      <a href="/business" data-i18n="nav_business">بانک اصناف</a>
+      <a href="/privacy" aria-current="page" data-i18n="nav_privacy">حریم خصوصی</a>
+      <select id="langSelect" aria-label="زبان" class="p3-btn p3-btn--ghost p3-btn--small">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+    </nav>
+  </div>
+</header>
+
+<main class="p3-wrap p3-main">
+  <div class="p3-card">
+    <h1 data-i18n="privacy_title">حریم خصوصی و استفادهٔ قانونی از اطلاعات</h1>
+    <ul class="p3-rules" id="rules"></ul>
+  </div>
+
+  <div class="p3-card">
+    <h2 data-i18n="opt_out">لغو دریافت تبلیغات</h2>
+    <p class="p3-hint" data-i18n="opt_out_sub"></p>
+    <form id="optOutForm" class="p3-grid p3-grid--3" style="margin-top:12px">
+      <div class="p3-field">
+        <label for="optPhone" data-i18n="phone">شماره تلفن</label>
+        <input id="optPhone" type="tel" dir="ltr" placeholder="+98…" required>
+      </div>
+      <div class="p3-field">
+        <label for="optChannel" data-i18n="channel">کانال</label>
+        <select id="optChannel">
+          <option value="all" data-i18n="all_channels">همهٔ کانال‌ها</option>
+          <option value="sms">SMS</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="telegram">Telegram</option>
+          <option value="instagram">Instagram</option>
+          <option value="call" data-i18n="call">تماس تلفنی</option>
+        </select>
+      </div>
+      <div class="p3-field" style="align-self:end">
+        <button class="p3-btn" type="submit" data-i18n="submit">ثبت</button>
+      </div>
+      <div class="p3-field" style="grid-column:1/-1">
+        <label for="optReason" data-i18n="reason">دلیل (اختیاری)</label>
+        <input id="optReason" type="text">
+      </div>
+    </form>
+    <p class="p3-hint" id="optStatus" role="status" aria-live="polite"></p>
+  </div>
+
+  <div class="p3-card">
+    <h2 data-i18n="deletion">درخواست حذف اطلاعات</h2>
+    <p class="p3-hint" data-i18n="deletion_sub"></p>
+    <form id="deleteForm" class="p3-grid p3-grid--3" style="margin-top:12px">
+      <div class="p3-field">
+        <label for="delPhone" data-i18n="phone">شماره تلفن</label>
+        <input id="delPhone" type="tel" dir="ltr" required>
+      </div>
+      <div class="p3-field">
+        <label for="delEntity" data-i18n="entity">شناسهٔ رکورد (اختیاری)</label>
+        <input id="delEntity" type="text" dir="ltr">
+      </div>
+      <div class="p3-field" style="align-self:end">
+        <button class="p3-btn" type="submit" data-i18n="submit">ثبت</button>
+      </div>
+      <div class="p3-field" style="grid-column:1/-1">
+        <label for="delReason" data-i18n="reason">دلیل (اختیاری)</label>
+        <input id="delReason" type="text">
+      </div>
+    </form>
+    <p class="p3-hint" id="delStatus" role="status" aria-live="polite"></p>
+  </div>
+
+  <div class="p3-card">
+    <h2 data-i18n="ad_request">درخواست تبلیغ</h2>
+    <p class="p3-hint" data-i18n="ad_request_sub"></p>
+    <form id="adRequestForm" class="p3-grid p3-grid--3" style="margin-top:12px">
+      <div class="p3-field">
+        <label for="rName" data-i18n="name">نام</label>
+        <input id="rName" type="text" required>
+      </div>
+      <div class="p3-field">
+        <label for="rBusiness" data-i18n="business_name">نام کسب‌وکار</label>
+        <input id="rBusiness" type="text" required>
+      </div>
+      <div class="p3-field">
+        <label for="rPhone" data-i18n="phone">شماره تماس</label>
+        <input id="rPhone" type="tel" dir="ltr" required>
+      </div>
+      <div class="p3-field">
+        <label for="rCountry" data-i18n="country">کشور</label>
+        <select id="rCountry"></select>
+      </div>
+      <div class="p3-field">
+        <label for="rCity" data-i18n="city">شهر</label>
+        <input id="rCity" type="text" required>
+      </div>
+      <div class="p3-field">
+        <label for="rIndustry" data-i18n="industry">صنف</label>
+        <select id="rIndustry"></select>
+      </div>
+      <div class="p3-field">
+        <label for="rNetwork" data-i18n="networks">شبکه</label>
+        <select id="rNetwork"></select>
+      </div>
+      <div class="p3-field">
+        <label for="rFormat" data-i18n="format">نوع تبلیغ</label>
+        <select id="rFormat"></select>
+      </div>
+      <div class="p3-field">
+        <label for="rBudget" data-i18n="budget">بودجه (دلار)</label>
+        <input id="rBudget" type="number" min="10" step="10" value="200" required>
+      </div>
+      <div class="p3-field">
+        <label for="rDuration" data-i18n="duration">مدت (روز)</label>
+        <input id="rDuration" type="number" min="1" max="90" value="7" required>
+      </div>
+      <label class="p3-check" style="grid-column:1/-1">
+        <input id="rConsent" type="checkbox" required>
+        <span data-i18n="consent_required"></span>
+      </label>
+      <div class="p3-field" style="align-self:end">
+        <button class="p3-btn" type="submit" data-i18n="submit">ثبت</button>
+      </div>
+    </form>
+    <p class="p3-hint" id="reqStatus" role="status" aria-live="polite"></p>
+  </div>
+</main>
+
+<script type="module" src="/js/privacy.js"></script>
+</body>
+</html>
