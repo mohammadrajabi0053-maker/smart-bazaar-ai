@@ -56,7 +56,9 @@ export function findSession(db, sid) {
 export function sessionExpiry(row) {
   const created = Date.parse(row?.createdAt || '') || Date.now();
   const seen = Date.parse(row?.lastSeenAt || '') || created;
-  const absolute = Date.parse(row?.expiresAt || '') || created + SESSION_ABSOLUTE_MS;
+  const stored = Date.parse(row?.expiresAt || '') || created + SESSION_ABSOLUTE_MS;
+  // سقف مطلق قابل تمدید نیست: کمینهٔ مقدار ثبت‌شده و createdAt + ۳۰ روز
+  const absolute = Math.min(stored, created + SESSION_ABSOLUTE_MS);
   return { absolute, idle: seen + SESSION_IDLE_MS };
 }
 
