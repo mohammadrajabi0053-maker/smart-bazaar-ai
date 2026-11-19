@@ -97,7 +97,11 @@ test('ثبت‌نام تلفنی مشتری و فروشنده با تأیید ش
   customerPhone = uniquePhone();
   const customer = await otpSignup(buyer, { phone: customerPhone, name: 'خریدار فاز سه', role: 'customer' });
   assert.equal(customer.role, 'customer');
-  assert.equal(customer.phone, customerPhone, 'شمارهٔ تأییدشده باید روی حساب ثبت شود');
+  assert.equal(
+    customer.phone.replace(/\D/g, '').replace(/^98/, '0'),
+    customerPhone,
+    'شمارهٔ تأییدشده باید روی حساب ثبت شود',
+  );
   assert.equal(customer.passwordHash, undefined, 'هش رمز نباید در پاسخ بیاید');
 
   const me = await buyer('/api/auth/me');
@@ -234,6 +238,7 @@ test('متقاضیان تبلیغات: رضایت الزامی، جلوگیری 
       phone: leadPhone,
       industry: leadIndustry,
       country: 'IR',
+      province: 'تهران',
       city: 'تهران',
       networks: ['instagram'],
       format: 'post',
@@ -251,6 +256,7 @@ test('متقاضیان تبلیغات: رضایت الزامی، جلوگیری 
     phone: leadPhone,
     industry: leadIndustry,
     country: 'IR',
+    province: 'تهران',
     city: 'تهران',
     networks: ['instagram', 'telegram'],
     format: 'post',
