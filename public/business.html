@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>بانک اطلاعات اصناف | بازار هوشمند</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏪</text></svg>">
+<link rel="stylesheet" href="/css/p3.css">
+</head>
+<body class="p3">
+
+<header class="p3-header">
+  <div class="p3-wrap p3-header__row">
+    <a class="p3-brand" href="/"><span class="logo">🏪</span><span data-i18n="brand">بازار هوشمند</span></a>
+    <nav class="p3-nav">
+      <a href="/" data-i18n="nav_store">فروشگاه</a>
+      <a href="/account" data-i18n="nav_account">حساب من</a>
+      <a href="/business" aria-current="page" data-i18n="nav_business">بانک اصناف</a>
+      <a href="/privacy" data-i18n="nav_privacy">حریم خصوصی</a>
+      <select id="langSelect" aria-label="زبان" class="p3-btn p3-btn--ghost p3-btn--small">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+    </nav>
+  </div>
+</header>
+
+<main class="p3-wrap p3-main">
+  <div class="p3-card">
+    <h1 data-i18n="directory_title">بانک اطلاعات اصناف و کسب‌وکارها</h1>
+    <p class="p3-hint" data-i18n="directory_sub"></p>
+    <div class="p3-stats" id="stats" style="margin-top:14px"></div>
+    <p class="p3-hint" id="accessNote" style="margin-top:10px"></p>
+  </div>
+
+  <div class="p3-tabs" role="tablist">
+    <button type="button" data-tab="businesses" role="tab" aria-selected="true" data-i18n="tab_businesses">کسب‌وکارها</button>
+    <button type="button" data-tab="leads" role="tab" aria-selected="false" data-i18n="tab_leads">متقاضیان تبلیغات</button>
+    <button type="button" data-tab="crm" role="tab" aria-selected="false" data-i18n="tab_crm">پیگیری ارتباطات</button>
+    <button type="button" data-tab="team" role="tab" aria-selected="false" data-i18n="tab_team">دسترسی تیم</button>
+    <button type="button" data-tab="audit" role="tab" aria-selected="false" data-i18n="tab_audit">گزارش فعالیت</button>
+  </div>
+
+  <!-- کسب‌وکارها -->
+  <section id="tab-businesses">
+    <div class="p3-card">
+      <h2 data-i18n="tab_businesses">کسب‌وکارها</h2>
+      <form id="bizFilters" class="p3-grid p3-grid--4" style="margin-top:10px">
+        <div class="p3-field">
+          <label for="bizSearch" data-i18n="search">جست‌وجو</label>
+          <input id="bizSearch" type="search" placeholder="نام، شهر، تلفن">
+        </div>
+        <div class="p3-field">
+          <label for="bizCountry" data-i18n="country">کشور</label>
+          <select id="bizCountry"></select>
+        </div>
+        <div class="p3-field">
+          <label for="bizIndustry" data-i18n="industry">صنف</label>
+          <select id="bizIndustry"></select>
+        </div>
+        <div class="p3-field">
+          <label for="bizType" data-i18n="type">نوع کسب‌وکار</label>
+          <select id="bizType"></select>
+        </div>
+        <div class="p3-field">
+          <label for="bizProvince" data-i18n="province">استان</label>
+          <select id="bizProvince"></select>
+        </div>
+        <div class="p3-field">
+          <label for="bizCity" data-i18n="city">شهر</label>
+          <input id="bizCity" type="text">
+        </div>
+        <div class="p3-field">
+          <label for="bizConsent" data-i18n="consent">رضایت تبلیغاتی</label>
+          <select id="bizConsent">
+            <option value="">—</option>
+            <option value="granted" data-i18n="consent_granted">رضایت داده</option>
+            <option value="pending" data-i18n="consent_pending">در انتظار</option>
+            <option value="revoked" data-i18n="consent_revoked">لغو شده</option>
+          </select>
+        </div>
+        <div class="p3-field">
+          <label for="bizDataset" data-i18n="source">منبع</label>
+          <select id="bizDataset">
+            <option value="">—</option>
+            <option value="live" data-i18n="live_data">دادهٔ واقعی</option>
+            <option value="demo" data-i18n="demo_data">دادهٔ نمایشی</option>
+          </select>
+        </div>
+      </form>
+      <div class="p3-row" style="margin-top:6px">
+        <button class="p3-btn p3-btn--small" id="applyFilters" type="button" data-i18n="search">جست‌وجو</button>
+        <button class="p3-btn p3-btn--ghost p3-btn--small" id="resetFilters" type="button">↺</button>
+        <a class="p3-btn p3-btn--ghost p3-btn--small" id="exportBtn" href="/api/directory/businesses/export.csv" data-i18n="export_csv">خروجی CSV</a>
+        <span class="p3-hint" id="bizCount"></span>
+      </div>
+    </div>
+
+    <div class="p3-card">
+      <div class="p3-row" style="justify-content:space-between">
+        <h3 style="margin:0" data-i18n="add_business">ثبت کسب‌وکار</h3>
+        <button class="p3-btn p3-btn--ghost p3-btn--small" id="toggleBizForm" type="button">＋</button>
+      </div>
+      <form id="bizForm" hidden style="margin-top:12px">
+        <div class="p3-grid p3-grid--3">
+          <div class="p3-field">
+            <label for="fName" data-i18n="business_name">نام کسب‌وکار</label>
+            <input id="fName" type="text" required>
+          </div>
+          <div class="p3-field">
+            <label for="fIndustry" data-i18n="industry">صنف</label>
+            <select id="fIndustry"></select>
+          </div>
+          <div class="p3-field">
+            <label for="fType" data-i18n="type">نوع کسب‌وکار</label>
+            <select id="fType"></select>
+          </div>
+          <div class="p3-field">
+            <label for="fCountry" data-i18n="country">کشور</label>
+            <select id="fCountry"></select>
+          </div>
+          <div class="p3-field">
+            <label for="fProvince" data-i18n="province">استان</label>
+            <input id="fProvince" type="text">
+          </div>
+          <div class="p3-field">
+            <label for="fCity" data-i18n="city">شهر</label>
+            <input id="fCity" type="text" required>
+          </div>
+          <div class="p3-field">
+            <label for="fPhone" data-i18n="phone">تلفن کاری</label>
+            <input id="fPhone" type="tel" dir="ltr" required>
+          </div>
+          <div class="p3-field">
+            <label for="fMobile" data-i18n="whatsapp">همراه کاری</label>
+            <input id="fMobile" type="tel" dir="ltr">
+          </div>
+          <div class="p3-field">
+            <label for="fSource" data-i18n="source">منبع اطلاعات</label>
+            <select id="fSource"></select>
+          </div>
+          <div class="p3-field">
+            <label for="fWhatsapp" data-i18n="whatsapp">واتساپ</label>
+            <input id="fWhatsapp" type="tel" dir="ltr">
+          </div>
+          <div class="p3-field">
+            <label for="fTelegram" data-i18n="telegram">تلگرام</label>
+            <input id="fTelegram" type="text" dir="ltr">
+          </div>
+          <div class="p3-field">
+            <label for="fInstagram" data-i18n="instagram">اینستاگرام</label>
+            <input id="fInstagram" type="text" dir="ltr">
+          </div>
+          <div class="p3-field">
+            <label for="fWebsite" data-i18n="website">وب‌سایت</label>
+            <input id="fWebsite" type="url" dir="ltr" placeholder="https://">
+          </div>
+          <div class="p3-field">
+            <label for="fConsent" data-i18n="consent">رضایت تبلیغاتی</label>
+            <select id="fConsent">
+              <option value="pending" data-i18n="consent_pending">در انتظار</option>
+              <option value="granted" data-i18n="consent_granted">رضایت داده</option>
+              <option value="denied" data-i18n="consent_denied">رد شده</option>
+            </select>
+          </div>
+          <div class="p3-field" style="grid-column:span 2">
+            <label for="fAddress" data-i18n="address">نشانی</label>
+            <input id="fAddress" type="text">
+          </div>
+        </div>
+        <button class="p3-btn" type="submit" data-i18n="save">ذخیره</button>
+        <span class="p3-hint" id="bizFormStatus" role="status" aria-live="polite"></span>
+      </form>
+    </div>
+
+    <div class="p3-card">
+      <div id="bizList" class="p3-list"></div>
+    </div>
+  </section>
+
+  <!-- متقاضیان تبلیغات -->
+  <section id="tab-leads" hidden>
+    <div class="p3-card">
+      <h2 data-i18n="tab_leads">متقاضیان تبلیغات</h2>
+      <form id="leadFilters" class="p3-grid p3-grid--3" style="margin-top:10px">
+        <div class="p3-field">
+          <label for="leadSearch" data-i18n="search">جست‌وجو</label>
+          <input id="leadSearch" type="search">
+        </div>
+        <div class="p3-field">
+          <label for="leadStatus" data-i18n="status">وضعیت</label>
+          <select id="leadStatus"></select>
+        </div>
+        <div class="p3-field">
+          <label for="leadNetwork" data-i18n="networks">شبکه</label>
+          <select id="leadNetwork"></select>
+        </div>
+      </form>
+      <div class="p3-row" style="margin-top:6px">
+        <button class="p3-btn p3-btn--small" id="applyLeadFilters" type="button" data-i18n="search">جست‌وجو</button>
+        <span class="p3-hint" id="leadCount"></span>
+      </div>
+    </div>
+    <div class="p3-card">
+      <div id="leadList" class="p3-list"></div>
+    </div>
+  </section>
+
+  <!-- CRM -->
+  <section id="tab-crm" hidden>
+    <div class="p3-card">
+      <h2 data-i18n="reminders">یادآوری‌های تماس</h2>
+      <div id="reminderList" class="p3-list" style="margin-top:10px"></div>
+    </div>
+    <div class="p3-card">
+      <h2 data-i18n="tab_crm">پیگیری ارتباطات</h2>
+      <form id="activityForm" style="margin-top:10px">
+        <div class="p3-grid p3-grid--3">
+          <div class="p3-field">
+            <label for="aEntity">شناسهٔ رکورد</label>
+            <input id="aEntity" type="text" dir="ltr" placeholder="business:… / lead:…" required>
+          </div>
+          <div class="p3-field">
+            <label for="aType" data-i18n="activity_type">نوع فعالیت</label>
+            <select id="aType"></select>
+          </div>
+          <div class="p3-field">
+            <label for="aOutcome" data-i18n="outcome">نتیجه</label>
+            <select id="aOutcome"></select>
+          </div>
+          <div class="p3-field" style="grid-column:span 2">
+            <label for="aSummary" data-i18n="summary">خلاصه</label>
+            <input id="aSummary" type="text" required>
+          </div>
+          <div class="p3-field">
+            <label for="aNext" data-i18n="next_call">زمان تماس بعدی</label>
+            <input id="aNext" type="datetime-local">
+          </div>
+        </div>
+        <button class="p3-btn" type="submit" data-i18n="save">ذخیره</button>
+        <span class="p3-hint" id="activityStatus" role="status" aria-live="polite"></span>
+      </form>
+    </div>
+    <div class="p3-card">
+      <h2 data-i18n="tab_crm">پیگیری ارتباطات</h2>
+      <div id="activityList" class="p3-list" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- تیم -->
+  <section id="tab-team" hidden>
+    <div class="p3-card">
+      <h2 data-i18n="tab_team">دسترسی تیم</h2>
+      <p class="p3-hint" data-i18n="contacts_hidden"></p>
+      <form id="teamForm" class="p3-grid p3-grid--3" style="margin-top:12px">
+        <div class="p3-field">
+          <label for="tPhone" data-i18n="phone">شماره تلفن</label>
+          <input id="tPhone" type="tel" dir="ltr" required>
+        </div>
+        <div class="p3-field">
+          <label for="tAccess" data-i18n="contacts_visible">دسترسی تماس</label>
+          <select id="tAccess">
+            <option value="0">✕</option>
+            <option value="1">✓</option>
+          </select>
+        </div>
+        <div class="p3-field" style="align-self:end">
+          <button class="p3-btn" type="submit" data-i18n="save">ذخیره</button>
+        </div>
+      </form>
+      <div id="teamList" class="p3-list" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- گزارش فعالیت -->
+  <section id="tab-audit" hidden>
+    <div class="p3-card">
+      <h2 data-i18n="tab_audit">گزارش فعالیت مدیران</h2>
+      <div id="auditList" class="p3-list" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <p class="p3-hint" data-i18n="test_mode"></p>
+</main>
+
+<script type="module" src="/js/business.js"></script>
+</body>
+</html>
