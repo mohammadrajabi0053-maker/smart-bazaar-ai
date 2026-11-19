@@ -56,6 +56,9 @@ const uniquePhone = () => {
   return `0912${String(Date.now()).slice(-6)}${String(phoneSeq).padStart(2, '0')}`.slice(0, 13);
 };
 
+/** مقایسهٔ شماره مستقل از قالب ذخیره‌سازی (+98 / 0) */
+const phoneDigits = (value) => String(value || '').replace(/\D/g, '').replace(/^98/, '0');
+
 async function adminClient() {
   const meta = (await anon('/api/meta')).json;
   const account = meta.demoAccounts.find((a) => a.role === 'admin');
@@ -97,16 +100,12 @@ test('ثبت‌نام تلفنی مشتری و فروشنده با تأیید ش
   customerPhone = uniquePhone();
   const customer = await otpSignup(buyer, { phone: customerPhone, name: 'خریدار فاز سه', role: 'customer' });
   assert.equal(customer.role, 'customer');
-  assert.equal(
-    customer.phone.replace(/\D/g, '').replace(/^98/, '0'),
-    customerPhone,
-    'شمارهٔ تأییدشده باید روی حساب ثبت شود',
-  );
+  assert.equal(phoneDigits(customer.phone), phoneDigits(customerPhone), 'شمارهٔ تأییدشده باید روی حساب ثبت شود');
   assert.equal(customer.passwordHash, undefined, 'هش رمز نباید در پاسخ بیاید');
 
   const me = await buyer('/api/auth/me');
   assert.equal(me.status, 200);
-  assert.equal(me.json.user.phone, customerPhone);
+  assert.equal(phoneDigits(me.json.user.phone), phoneDigits(customerPhone));
 
   const sellerPhone = uniquePhone();
   sellerClient = client();
