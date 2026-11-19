@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>پنل من | بازار هوشمند</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏪</text></svg>">
+<link rel="stylesheet" href="/css/p3.css">
+</head>
+<body class="p3">
+
+<header class="p3-header">
+  <div class="p3-wrap p3-header__row">
+    <a class="p3-brand" href="/"><span class="logo">🏪</span><span data-i18n="brand">بازار هوشمند</span></a>
+    <nav class="p3-nav">
+      <a href="/" data-i18n="nav_store">فروشگاه</a>
+      <a href="/account" aria-current="page" data-i18n="nav_account">حساب من</a>
+      <a href="/business" data-i18n="nav_business">بانک اصناف</a>
+      <a href="/privacy" data-i18n="nav_privacy">حریم خصوصی</a>
+      <select id="langSelect" aria-label="زبان" class="p3-btn p3-btn--ghost p3-btn--small">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="tr">Türkçe</option>
+      </select>
+    </nav>
+  </div>
+</header>
+
+<main class="p3-wrap p3-main">
+  <div class="p3-card" id="gate" hidden>
+    <h1 data-i18n="my_account">پنل من</h1>
+    <p class="p3-hint" id="gateText"></p>
+    <a class="p3-btn" href="/login?next=/account" style="margin-top:12px" data-i18n="tab_login">ورود</a>
+  </div>
+
+  <div id="panel" hidden>
+    <div class="p3-card">
+      <div class="p3-row" style="justify-content:space-between">
+        <div>
+          <h1 id="userName" style="margin:0">—</h1>
+          <p class="p3-hint" id="userMeta"></p>
+        </div>
+        <div class="p3-row">
+          <a class="p3-btn p3-btn--ghost p3-btn--small" href="/seller" id="sellerLink" hidden>🏪 <span data-i18n="seller_profile">پروفایل فروشنده</span></a>
+          <button class="p3-btn p3-btn--ghost p3-btn--small" id="logoutBtn" type="button" data-i18n="logout">خروج</button>
+        </div>
+      </div>
+      <div class="p3-stats" style="margin-top:14px" id="stats"></div>
+    </div>
+
+    <div class="p3-tabs" role="tablist">
+      <button type="button" data-tab="orders" role="tab" aria-selected="true" data-i18n="my_orders">سفارش‌های من</button>
+      <button type="button" data-tab="profile" role="tab" aria-selected="false" data-i18n="profile">پروفایل</button>
+    </div>
+
+    <section id="tab-orders">
+      <div class="p3-card">
+        <div class="p3-row" style="justify-content:space-between;margin-bottom:10px">
+          <h2 style="margin:0" data-i18n="my_orders">سفارش‌های من</h2>
+          <div class="p3-field" style="margin:0;max-width:190px">
+            <select id="orderFilter">
+              <option value="" data-i18n="my_orders">همه</option>
+            </select>
+          </div>
+        </div>
+        <div id="orderList" class="p3-list"></div>
+      </div>
+    </section>
+
+    <section id="tab-profile" hidden>
+      <div class="p3-card">
+        <h2 data-i18n="profile">پروفایل</h2>
+        <form id="profileForm" novalidate>
+          <div class="p3-grid p3-grid--2">
+            <div class="p3-field">
+              <label for="pName" data-i18n="name">نام</label>
+              <input id="pName" type="text" autocomplete="name">
+            </div>
+            <div class="p3-field">
+              <label for="pPhone" data-i18n="phone">شماره تلفن</label>
+              <input id="pPhone" type="tel" dir="ltr" disabled>
+            </div>
+            <div class="p3-field">
+              <label for="pCity" data-i18n="city">شهر</label>
+              <input id="pCity" type="text">
+            </div>
+            <div class="p3-field">
+              <label for="pAddress" data-i18n="address">نشانی</label>
+              <input id="pAddress" type="text">
+            </div>
+          </div>
+          <button class="p3-btn" type="submit" data-i18n="save">ذخیره</button>
+          <span class="p3-hint" id="profileStatus" role="status" aria-live="polite"></span>
+        </form>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script type="module" src="/js/account.js"></script>
+</body>
+</html>
