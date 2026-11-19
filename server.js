@@ -1641,7 +1641,8 @@ export function createApp() {
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
 
-  app.use(['/finance.html', '/js/finance.js', '/css/finance.css'], (req, res, next) => {
+  // گارد پیش از فایل‌های استاتیک: /finance نباید با extensions استاتیک دور زده شود
+  app.use(['/finance', '/finance.html', '/js/finance.js', '/css/finance.css'], (req, res, next) => {
     if (!req.user) return res.redirect('/?next=/finance');
     if (!isOwner(getDb(), req.user)) return res.status(403).type('html').send(deniedHtml);
     return next();

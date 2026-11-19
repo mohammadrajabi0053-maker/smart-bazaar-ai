@@ -64,6 +64,16 @@ async function ownerSession() {
   return { owner, adminAccount };
 }
 
+async function ensureTotp(owner) {
+  const setup = await owner('/api/finance/security/2fa/setup', { method: 'POST', body: {} });
+  assert.equal(setup.status, 200);
+  const enabled = await owner('/api/finance/security/2fa/enable', {
+    method: 'POST', body: { code: totpCode(setup.json.secret) },
+  });
+  assert.equal(enabled.status, 200);
+  return setup.json.secret;
+}
+
 test('دسترسی مالی فقط برای مدیر اصلی: ۴۰۱ بی‌نشست و ۴۰۳ سایر نقش‌ها', async () => {
   const anonRes = await anon('/api/finance/overview');
   assert.equal(anonRes.status, 401);
@@ -194,7 +204,7 @@ test('برداشت وجه بدون تأیید دومرحله‌ای انجام �
   });
   assert.equal(approved.status, 200);
   assert.equal(approved.json.withdrawal.status, 'approved');
-  assert.equal(approved.json.withdrawal.payoutExecuted, false);
+  assert.equal(approved.json.withdrawal.payoutStatus, 'disabled');
   assert.equal(approved.json.payoutEnabled, false);
 });
 
@@ -226,8 +236,9 @@ test('گزارش اختصاصی مدیر اصلی با تأیید دومرحله
   assert.equal(noAuth.status, 403);
   assert.equal(noAuth.json.error, 'authorization_required');
 
+  const secret = await ensureTotp(owner);
   const authorize = await owner(`/api/finance/reports/${grantId}/authorize`, {
-    method: 'POST', body: { password: adminAccount.password, code: totpCode((await owner('/api/finance/security/2fa/setup', { method: 'POST', body: {} })).json.secret) },
+    method: 'POST', body: { password: adminAccount.password, code: totpCode(secret) },
   });
   assert.equal(authorize.status, 200);
   assert.ok(authorize.json.authorization.id);
