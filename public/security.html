@@ -99,6 +99,7 @@
         <button class="fin-btn" id="backupCreateBtn" type="button">ساخت پشتیبان</button>
       </div>
       <p class="fin-note" id="backupLimit">—</p>
+      <p class="fin-note" id="backupCoverage">—</p>
     </div>
 
     <div class="fin-block">
@@ -130,6 +131,36 @@
         <button class="fin-btn danger" id="restoreApplyBtn" type="button">بازیابی واقعی</button>
       </div>
       <pre class="fin-pre" id="restoreOut">نتیجه در اینجا نمایش داده می‌شود.</pre>
+    </div>
+
+    <div class="fin-block">
+      <h2>بازیابی از فایل دانلودشده (پس از Redeploy)</h2>
+      <p class="fin-note">در پلن رایگان دیسک پایدار وجود ندارد؛ اگر نمونه بازاستقرار شد، فایل <code>.sbbak</code> را که دانلود کرده‌اید از همین‌جا برگردانید. ابتدا پیش‌نمایش (بدون تغییر داده) اجرا می‌شود؛ بازیابی واقعی نیازمند تأیید دومرحله‌ای و عبارت <code>RESTORE</code> است و پیش از جای‌گزینی پشتیبان ایمنی می‌سازد. تصاویر هم به‌همراه داده بازگردانده می‌شوند.</p>
+      <div class="fin-row">
+        <label class="fin-field grow"><span>فایل پشتیبان</span><input id="importFile" type="file" accept=".sbbak,application/octet-stream,text/plain"></label>
+        <button class="fin-btn ghost" id="importPreviewBtn" type="button">پیش‌نمایش فایل</button>
+      </div>
+      <div class="fin-row">
+        <label class="fin-field"><span>عبارت تأیید</span><input id="importConfirm" placeholder="RESTORE"></label>
+        <button class="fin-btn danger" id="importApplyBtn" type="button">بازیابی از فایل</button>
+      </div>
+      <p class="fin-note">رمز عبور و کد Authenticator از بخش «تأیید دومرحله‌ای» پایین صفحه خوانده می‌شود.</p>
+      <pre class="fin-pre" id="importOut">نتیجه در اینجا نمایش داده می‌شود.</pre>
+    </div>
+
+    <div class="fin-block">
+      <h2>کیت بازیابی کلیدها</h2>
+      <p class="fin-note">کلید رمزنگاری پشتیبان و کلید HMAC زنجیرهٔ مالی فقط روی همین نمونه هستند. برای اینکه پس از Redeploy بتوانید پشتیبان قدیمی را باز کنید، یک کیت رمزگذاری‌شده با گذرواژهٔ خودتان (حداقل ۱۲ نویسه) بسازید و در جای امن نگه دارید.</p>
+      <div class="fin-row">
+        <label class="fin-field grow"><span>گذرواژهٔ کیت (حداقل ۱۲ نویسه)</span><input id="kitPassphrase" type="password" autocomplete="new-password"></label>
+        <button class="fin-btn" id="kitCreateBtn" type="button">ساخت و دانلود کیت (۲FA)</button>
+      </div>
+      <div class="fin-row">
+        <label class="fin-field grow"><span>فایل کیت</span><input id="kitFile" type="file" accept=".sbkey,text/plain,application/octet-stream"></label>
+        <label class="fin-field"><span>گذرواژهٔ کیت</span><input id="kitInstallPassphrase" type="password" autocomplete="off"></label>
+        <button class="fin-btn ghost" id="kitInstallBtn" type="button">نصب کلیدها (۲FA)</button>
+      </div>
+      <p class="fin-note" id="kitOut">وضعیت کلیدها در اینجا نمایش داده می‌شود.</p>
     </div>
   </section>
 
