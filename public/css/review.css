@@ -1,0 +1,371 @@
+/* مرکز بررسی سه فاز — استایل مستقل، راست‌چین و واکنش‌گرا */
+:root {
+  --rv-bg: #f4f6fb;
+  --rv-card: #ffffff;
+  --rv-ink: #131a2b;
+  --rv-muted: #5b6478;
+  --rv-line: #e2e7f2;
+  --rv-brand: #4b3fd6;
+  --rv-brand-2: #1f9d8f;
+  --rv-done: #0f8a4d;
+  --rv-done-bg: #e6f7ee;
+  --rv-partial: #a86b00;
+  --rv-partial-bg: #fdf2dc;
+  --rv-connect: #1c5fd0;
+  --rv-connect-bg: #e6effd;
+  --rv-radius: 16px;
+  --rv-shadow: 0 10px 30px rgba(19, 26, 43, .08);
+}
+
+* { box-sizing: border-box; }
+
+body.rv {
+  margin: 0;
+  background:
+    radial-gradient(1100px 500px at 100% -10%, #e7e4ff 0%, transparent 60%),
+    radial-gradient(900px 420px at 0% 0%, #dcf6f1 0%, transparent 55%),
+    var(--rv-bg);
+  color: var(--rv-ink);
+  font-family: "Vazirmatn", "IRANSans", "Segoe UI", Tahoma, sans-serif;
+  line-height: 1.75;
+  -webkit-text-size-adjust: 100%;
+}
+
+body.rv[dir="ltr"] { line-height: 1.6; }
+
+.rv-wrap { width: min(1180px, 100% - 2rem); margin-inline: auto; }
+
+/* ---------- نوار بالا ---------- */
+.rv-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, .82);
+  border-bottom: 1px solid var(--rv-line);
+}
+.rv-top__row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  min-height: 62px;
+  flex-wrap: wrap;
+}
+.rv-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  font-weight: 800;
+  color: var(--rv-ink);
+  text-decoration: none;
+  font-size: .98rem;
+}
+.rv-brand span.dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--rv-brand), var(--rv-brand-2));
+}
+.rv-spacer { flex: 1 1 auto; }
+
+.rv-lang {
+  border: 1px solid var(--rv-line);
+  background: #fff;
+  border-radius: 999px;
+  padding: .38rem .8rem;
+  font: inherit;
+  font-size: .85rem;
+  color: var(--rv-ink);
+  cursor: pointer;
+}
+
+.rv-link {
+  color: var(--rv-muted);
+  text-decoration: none;
+  font-size: .88rem;
+  font-weight: 600;
+  padding: .3rem .55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.rv-link:hover { background: #eef1f9; color: var(--rv-brand); }
+
+/* ---------- دکمه‌ها ---------- */
+.rv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: .68rem 1.1rem;
+  font: inherit;
+  font-weight: 700;
+  font-size: .92rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.rv-btn--primary {
+  background: linear-gradient(135deg, var(--rv-brand), #6b5bff);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(75, 63, 214, .28);
+}
+.rv-btn--primary:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(75, 63, 214, .34); }
+.rv-btn--ghost {
+  background: #fff;
+  color: var(--rv-ink);
+  border-color: var(--rv-line);
+}
+.rv-btn--ghost:hover { border-color: var(--rv-brand); color: var(--rv-brand); }
+.rv-btn--sm { padding: .45rem .8rem; font-size: .82rem; border-radius: 10px; }
+.rv-btn[disabled] { opacity: .6; cursor: progress; }
+
+/* ---------- هدر صفحه ---------- */
+.rv-hero { padding: 2.2rem 0 1rem; }
+.rv-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  background: #fff;
+  border: 1px solid var(--rv-line);
+  color: var(--rv-brand);
+  border-radius: 999px;
+  padding: .28rem .8rem;
+  font-size: .78rem;
+  font-weight: 700;
+}
+.rv-title {
+  margin: .7rem 0 .5rem;
+  font-size: clamp(1.5rem, 4.2vw, 2.3rem);
+  line-height: 1.35;
+  letter-spacing: -.01em;
+}
+.rv-sub { margin: 0; color: var(--rv-muted); font-size: clamp(.9rem, 2.4vw, 1rem); max-width: 62ch; }
+
+/* ---------- آمار کلی ---------- */
+.rv-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: .75rem;
+  margin: 1.4rem 0 .4rem;
+}
+.rv-stat {
+  background: var(--rv-card);
+  border: 1px solid var(--rv-line);
+  border-radius: 14px;
+  padding: .8rem .95rem;
+  box-shadow: var(--rv-shadow);
+}
+.rv-stat b { display: block; font-size: 1.35rem; line-height: 1.2; }
+.rv-stat span { font-size: .8rem; color: var(--rv-muted); }
+
+/* ---------- کارت فاز ---------- */
+.rv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  padding: .6rem 0 1.5rem;
+  align-items: start;
+}
+.rv-phase {
+  background: var(--rv-card);
+  border: 1px solid var(--rv-line);
+  border-radius: var(--rv-radius);
+  box-shadow: var(--rv-shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.rv-phase__head {
+  padding: 1rem 1.1rem .85rem;
+  border-bottom: 1px dashed var(--rv-line);
+  background: linear-gradient(180deg, #fafbff, #fff);
+}
+.rv-phase__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--rv-brand), var(--rv-brand-2));
+  color: #fff;
+  font-weight: 800;
+  font-size: .95rem;
+  margin-inline-end: .55rem;
+}
+.rv-phase__title { display: flex; align-items: center; font-size: 1.08rem; font-weight: 800; margin: 0 0 .35rem; }
+.rv-phase__tag { margin: 0; color: var(--rv-muted); font-size: .85rem; }
+.rv-phase__body { padding: .9rem 1.1rem; flex: 1 1 auto; }
+
+.rv-mini {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-bottom: .8rem;
+}
+.rv-pill {
+  font-size: .74rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: .18rem .6rem;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.rv-pill--done { background: var(--rv-done-bg); color: var(--rv-done); border-color: #c8ecd8; }
+.rv-pill--partial { background: var(--rv-partial-bg); color: var(--rv-partial); border-color: #f3ddb4; }
+.rv-pill--connect { background: var(--rv-connect-bg); color: var(--rv-connect); border-color: #cbdffb; }
+.rv-pill--muted { background: #eef1f8; color: var(--rv-muted); border-color: #e2e7f2; }
+
+/* ---------- فهرست امکانات ---------- */
+.rv-feats { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+.rv-feat {
+  border: 1px solid var(--rv-line);
+  border-radius: 12px;
+  padding: .55rem .7rem;
+  background: #fcfdff;
+}
+.rv-feat__row { display: flex; align-items: flex-start; gap: .5rem; justify-content: space-between; }
+.rv-feat__title { font-size: .88rem; font-weight: 700; }
+.rv-feat__note { margin: .35rem 0 0; font-size: .78rem; color: var(--rv-muted); }
+.rv-feat__link {
+  display: inline-block;
+  margin-top: .35rem;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--rv-brand);
+  text-decoration: none;
+}
+.rv-feat__link:hover { text-decoration: underline; }
+
+/* ---------- گزارش آزمایش‌ها ---------- */
+.rv-tests { list-style: none; margin: .2rem 0 0; padding: 0; display: grid; gap: .35rem; }
+.rv-test {
+  display: flex;
+  gap: .45rem;
+  align-items: baseline;
+  font-size: .8rem;
+  color: var(--rv-muted);
+  border-bottom: 1px dotted var(--rv-line);
+  padding-bottom: .3rem;
+}
+.rv-test:last-child { border-bottom: 0; padding-bottom: 0; }
+.rv-test b { color: var(--rv-ink); font-weight: 700; }
+.rv-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; translate: 0 -1px; }
+.rv-dot--passed { background: var(--rv-done); }
+.rv-dot--partial { background: var(--rv-partial); }
+.rv-dot--blocked { background: var(--rv-connect); }
+
+.rv-phase__foot {
+  padding: .85rem 1.1rem 1.05rem;
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--rv-line);
+  background: #fbfcff;
+}
+
+/* ---------- بنر دادهٔ نمایشی ---------- */
+.rv-note {
+  display: flex;
+  gap: .6rem;
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid var(--rv-line);
+  border-inline-start: 4px solid var(--rv-brand-2);
+  border-radius: 12px;
+  padding: .75rem .9rem;
+  font-size: .83rem;
+  color: var(--rv-muted);
+  margin: 1rem 0;
+}
+.rv-note b { color: var(--rv-ink); }
+
+/* ---------- صفحهٔ فاز ---------- */
+.rv-section {
+  background: var(--rv-card);
+  border: 1px solid var(--rv-line);
+  border-radius: var(--rv-radius);
+  box-shadow: var(--rv-shadow);
+  padding: 1rem 1.15rem;
+  margin: 1rem 0;
+}
+.rv-section > h2 {
+  margin: 0 0 .75rem;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+}
+.rv-section > h2 small { font-weight: 600; color: var(--rv-muted); font-size: .78rem; }
+
+.rv-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+
+.rv-links { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+.rv-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.rv-table th, .rv-table td { text-align: start; padding: .5rem .45rem; border-bottom: 1px solid var(--rv-line); vertical-align: top; }
+.rv-table th { color: var(--rv-muted); font-weight: 700; font-size: .76rem; }
+.rv-table tr:last-child td { border-bottom: 0; }
+
+.rv-live { display: grid; gap: .45rem; margin-top: .6rem; }
+.rv-live__row {
+  display: flex;
+  gap: .5rem;
+  align-items: baseline;
+  justify-content: space-between;
+  border: 1px solid var(--rv-line);
+  border-radius: 10px;
+  padding: .5rem .65rem;
+  font-size: .82rem;
+  background: #fcfdff;
+}
+.rv-live__code { font-family: ui-monospace, Menlo, monospace; font-size: .76rem; color: var(--rv-muted); }
+
+.rv-textarea {
+  width: 100%;
+  min-height: 96px;
+  border: 1px solid var(--rv-line);
+  border-radius: 12px;
+  padding: .6rem .7rem;
+  font: inherit;
+  font-size: .85rem;
+  resize: vertical;
+  background: #fcfdff;
+}
+.rv-textarea:focus { outline: 2px solid rgba(75, 63, 214, .25); border-color: var(--rv-brand); }
+
+.rv-saved { color: var(--rv-done); font-size: .8rem; font-weight: 700; }
+
+.rv-foot {
+  text-align: center;
+  color: var(--rv-muted);
+  font-size: .78rem;
+  padding: 1.5rem 0 2.5rem;
+}
+.rv-foot a { color: var(--rv-brand); text-decoration: none; font-weight: 700; }
+
+.rv-loading, .rv-error { padding: 2rem 0; text-align: center; color: var(--rv-muted); }
+.rv-error { color: #b3261e; }
+
+/* ---------- موبایل ---------- */
+@media (max-width: 720px) {
+  .rv-wrap { width: min(100% - 1.4rem, 1180px); }
+  .rv-top__row { min-height: 56px; gap: .4rem; padding-block: .35rem; }
+  .rv-brand { font-size: .9rem; }
+  .rv-link { font-size: .8rem; padding: .25rem .4rem; }
+  .rv-hero { padding-top: 1.4rem; }
+  .rv-grid { grid-template-columns: 1fr; }
+  .rv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rv-phase__foot .rv-btn { flex: 1 1 100%; }
+  .rv-btn { padding: .7rem .9rem; }
+  .rv-table { font-size: .78rem; }
+  .rv-table th, .rv-table td { padding: .45rem .3rem; }
+}
+
+@media (max-width: 380px) {
+  .rv-stats { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-btn { transition: none; }
+}
