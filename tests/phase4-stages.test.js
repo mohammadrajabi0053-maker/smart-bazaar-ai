@@ -77,7 +77,7 @@ test('پشتیبان بایت تصاویر را در بر می‌گیرد و ب�
   const checked = backup.verifyBackup(made.buffer);
   assert.equal(checked.chain.valid, true);
   assert.equal(checked.uploadsMeta.count >= 1, true);
-  assert.equal(checked.uploadsMeta.bytes >= bytes.length, true);
+  assert.equal(checked.uploadsMeta.totalBytes >= bytes.length, true);
 
   const restored = backup.readBackupForRestore(made.buffer);
   const entry = restored.uploads.find((item) => item.name === file);
@@ -95,7 +95,7 @@ test('پشتیبان داده و زنجیره را کامل بازمی‌گرد�
   const db = ledgerDb();
   const made = backup.createBackup(db, { reason: 'test' });
   const restored = backup.readBackupForRestore(made.buffer);
-  assert.equal(restored.counts.financeEntries, 2);
+  assert.equal(restored.data.finance.entries.length, 2);
   assert.equal(restored.chain.valid, true);
   assert.equal(restored.chain.signed, 2);
   assert.equal(restored.data.finance.entries.length, 2);
@@ -115,7 +115,7 @@ test('فایل خراب و دست‌کاری‌شده رد می‌شود', () =>
   const body = parts[2];
   const flipped = `${body.slice(0, 10)}${body[10] === 'A' ? 'B' : 'A'}${body.slice(11)}`;
   const tampered = Buffer.from([parts[0], parts[1], flipped, parts[3]].join('\n'), 'utf8');
-  assert.throws(() => backup.readBackupForRestore(tampered), /backup_corrupt|backup_auth_failed/);
+  assert.throws(() => backup.readBackupForRestore(tampered), /backup_tampered|backup_corrupt|backup_auth_failed/);
 });
 
 test('کلید اشتباه پشتیبان را باز نمی‌کند و کیت کلید این وضعیت را حل می‌کند', () => {
@@ -134,7 +134,7 @@ test('کلید اشتباه پشتیبان را باز نمی‌کند و کیت
   process.env.BACKUP_KEY = originalBackupKey;
   backup.resetBackupKeyCache();
   const reopened = backup.readBackupForRestore(made.buffer);
-  assert.equal(reopened.counts.financeEntries, 2);
+  assert.equal(reopened.data.finance.entries.length, 2);
   assert.equal(reopened.chain.valid, true);
 });
 
@@ -157,7 +157,7 @@ test('بررسی صحت پیش از ارائهٔ فایل، زنجیره و تص
   const made = backup.createBackup(ledgerDb(), { reason: 'test' });
   const checked = backup.verifyBackup(made.buffer);
   assert.equal(checked.chain.valid, true);
-  assert.equal(checked.environment.demo, true);
+  assert.equal(checked.environment, 'demo');
   assert.equal(typeof checked.uploads, 'number');
   assert.equal(typeof checked.counts.users, 'number');
 });
