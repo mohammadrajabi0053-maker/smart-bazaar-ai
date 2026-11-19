@@ -23,6 +23,10 @@ const EMPTY = () => ({
   otpChallenges: [],
   auditLog: [],
   discounts: [],
+  // فاز چهارم: نشست‌ها، تاریخچه پشتیبان و هشدارهای امنیتی
+  sessions: [],
+  backupHistory: [],
+  alerts: [],
   settings: { createdAt: new Date().toISOString() },
 });
 
@@ -81,6 +85,16 @@ export function id() {
 
 export function resetDbForTests() {
   db = null;
+}
+
+/** جایگزینی کامل داده در حافظه (برای بازیابی پشتیبان) و نوشتن اتمیک روی دیسک */
+export function replaceDb(next) {
+  if (!next || typeof next !== 'object' || Array.isArray(next)) {
+    throw new Error('invalid_db_payload');
+  }
+  db = { ...EMPTY(), ...next };
+  saveDb();
+  return db;
 }
 
 export function ensureUploadDir() {

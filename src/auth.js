@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, getDb, saveDbSoon } from './store.js';
+import { findSession, registerSession, touchSession } from './sessions.js';
 
 const COOKIE_NAME = 'sb_session';
 const SESSION_DAYS = 30;
@@ -48,9 +49,9 @@ function sign(value) {
   return crypto.createHmac('sha256', sessionSecret()).update(value).digest('base64url');
 }
 
-export function createSessionToken(user) {
+export function createSessionToken(user, sid) {
   const payload = Buffer.from(
-    JSON.stringify({ uid: user.id, role: user.role, iat: Date.now() }),
+    JSON.stringify({ uid: user.id, role: user.role, iat: Date.now(), ...(sid ? { sid } : {}) }),
   ).toString('base64url');
   return `${payload}.${sign(payload)}`;
 }
@@ -85,8 +86,13 @@ export function parseCookies(header = '') {
   return out;
 }
 
-export function setSessionCookie(res, user) {
-  const token = createSessionToken(user);
+export function setSessionCookie(res, user, req) {
+  const db = getDb();
+  const row = registerSession(db, user, {
+    ip: req?.ip,
+    ua: req?.headers?.['user-agent'],
+  });
+  const token = createSessionToken(user, row.id);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'lax',
@@ -94,6 +100,12 @@ export function setSessionCookie(res, user) {
     maxAge: SESSION_DAYS * 864e5,
     path: '/',
   });
+  return row;
+}
+
+export function currentSessionId(req) {
+  const session = readSessionToken(req.cookies?.[COOKIE_NAME]);
+  return session?.sid || null;
 }
 
 export function clearSessionCookie(res) {
@@ -104,12 +116,19 @@ export function currentUser(req) {
   const token = req.cookies?.[COOKIE_NAME];
   const session = readSessionToken(token);
   if (!session) return null;
-  const user = getDb().users.find((u) => u.id === session.uid);
+  const db = getDb();
+  const user = db.users.find((u) => u.id === session.uid);
   if (!user || user.status === 'blocked') return null;
   // ابطال همهٔ نشست‌های قدیمی (خروج از تمام دستگاه‌ها)
   if (user.sessionFrom) {
     const from = Date.parse(user.sessionFrom);
     if (Number.isFinite(from) && Number(session.iat) < from) return null;
+  }
+  // ابطال انتخابی/گروهی از دفتر نشست‌ها
+  if (session.sid) {
+    const row = findSession(db, session.sid);
+    if (!row || row.revokedAt || row.userId !== user.id) return null;
+    touchSession(db, session.sid, { ip: req.ip, ua: req.headers?.['user-agent'] });
   }
   return user;
 }
