@@ -9,6 +9,8 @@ const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'smart-bazaar-p3-'));
 process.env.DATA_DIR = tmpDir;
 process.env.SESSION_SECRET = 'test-session-secret-value-1234567890';
 process.env.NODE_ENV = 'test';
+// مجموعه تست چند ثبت‌نام تلفنی انجام می‌دهد؛ سقف نرخ فقط در همین محیط بالا می‌رود
+process.env.OTP_RATE_MAX = '500';
 
 const { createApp } = await import('../server.js');
 const { seedIfEmpty } = await import('../src/seed.js');

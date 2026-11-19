@@ -1716,7 +1716,8 @@ export function createApp() {
 
   /* ----------------------- فاز سوم: احراز هویت تلفنی ----------------------- */
 
-  const otpLimiter = createLimiter({ windowMs: 60000, max: 15 });
+  // سقف پیش‌فرض امن؛ در محیط تست از OTP_RATE_MAX بالا برده می‌شود
+  const otpLimiter = createLimiter({ windowMs: 60000, max: Number(process.env.OTP_RATE_MAX) || 15 });
   const directoryLimiter = createLimiter({ windowMs: 60000, max: 150 });
   const directoryRoles = ['admin', 'agent'];
   const canSeeContacts = (user) => Boolean(user) && (user.role === 'admin' || user.contactAccess === true);
