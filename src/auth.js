@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, getDb, saveDbSoon } from './store.js';
-import { findSession, registerSession, touchSession } from './sessions.js';
+import { findSession, registerSession, revokeSession, rotateSession, sessionExpired, touchSession } from './sessions.js';
 
 const COOKIE_NAME = 'sb_session';
 const SESSION_DAYS = 30;
@@ -103,6 +103,25 @@ export function setSessionCookie(res, user, req) {
   return row;
 }
 
+// چرخش شناسهٔ نشست جاری پس از عملیات حساس (۲FA، کیت کلیدها، بازیابی بکاپ)
+export function rotateCurrentSession(req, res, user) {
+  const db = getDb();
+  const oldSid = currentSessionId(req);
+  const row = rotateSession(db, user, oldSid, {
+    ip: req?.ip,
+    ua: req?.headers?.['user-agent'],
+  });
+  const token = createSessionToken(user, row.id);
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.COOKIE_SECURE === 'true',
+    maxAge: SESSION_DAYS * 864e5,
+    path: '/',
+  });
+  return row;
+}
+
 export function currentSessionId(req) {
   const session = readSessionToken(req.cookies?.[COOKIE_NAME]);
   return session?.sid || null;
@@ -128,6 +147,10 @@ export function currentUser(req) {
   if (session.sid) {
     const row = findSession(db, session.sid);
     if (!row || row.revokedAt || row.userId !== user.id) return null;
+    if (sessionExpired(row)) {
+      revokeSession(db, user.id, session.sid, 'expired');
+      return null;
+    }
     touchSession(db, session.sid, { ip: req.ip, ua: req.headers?.['user-agent'] });
   }
   return user;
