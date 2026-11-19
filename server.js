@@ -446,7 +446,7 @@ export function createApp() {
     };
     db.users.push(user);
     saveDbSoon();
-    setSessionCookie(res, user);
+    setSessionCookie(res, user, req);
     res.status(201).json({ user: publicUser(user) });
   });
 
@@ -485,7 +485,7 @@ export function createApp() {
     }
     if (user.status === 'blocked') return res.status(403).json({ error: 'account_blocked' });
     clearLoginFailures(req, email);
-    setSessionCookie(res, user);
+    setSessionCookie(res, user, req);
     res.json({ user: publicUser(user) });
   });
 
@@ -1590,7 +1590,14 @@ export function createApp() {
       lastFailedAt: finance.security.lastFailedAt || null,
       deniedAttempts: Number(finance.security.denied) || 0,
       chain: verifyChain(db),
-      backup: { mode: 'encrypted-json', automated: false, requiresPersistentDisk: true },
+      backup: {
+        mode: 'aes-256-gcm',
+        keySource: backupKeySource(),
+        automated: Boolean(db.settings?.backup?.enabled),
+        lastBackupAt: (Array.isArray(db.backupHistory) ? db.backupHistory.slice(-1)[0]?.createdAt : null) || null,
+        count: Array.isArray(db.backupHistory) ? db.backupHistory.length : 0,
+        requiresPersistentDisk: true,
+      },
       paymentsEnabled: false,
       payoutEnabled: false,
     });
@@ -1892,7 +1899,7 @@ export function createApp() {
     }
 
     if (user.status === 'blocked') return res.status(403).json({ error: 'account_blocked' });
-    setSessionCookie(res, user);
+    setSessionCookie(res, user, req);
     saveDbSoon();
     res.json({ user: publicUser(user), phoneVerified: true });
   });
