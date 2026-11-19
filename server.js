@@ -28,12 +28,25 @@ import {
   decryptJson, encryptJson, newTotpSecret, otpauthUrl, randomToken, sha256, verifyTotp,
 } from './src/secure.js';
 import {
-  getDb, saveDb, saveDbSoon, flushDb, id, ensureUploadDir, UPLOAD_DIR,
+  getDb, saveDb, saveDbSoon, flushDb, id, ensureUploadDir, UPLOAD_DIR, replaceDb,
 } from './src/store.js';
 import {
+  generateRecoveryCodes, listSessions, recoveryCodeCount, revokeAllSessions, revokeOtherSessions,
+  revokeSession, sessionView, verifyRecoveryCode,
+} from './src/sessions.js';
+import { EnvError, currentMode, envSummary, setMode } from './src/envmode.js';
+import {
+  WebAuthnError, consumeChallenge, credentialView, issueChallenge, verifyAssertion, verifyRegistration,
+} from './src/webauthn.js';
+import { alertConfig, dispatchAlert, monitorOverview, recentAlerts, setAlertConfig } from './src/monitor.js';
+import {
   attachUser, requireAuth, requireRole, setSessionCookie, clearSessionCookie,
-  publicUser, hashPassword, verifyPassword, parseCookies,
+  publicUser, hashPassword, verifyPassword, parseCookies, currentSessionId,
 } from './src/auth.js';
+import {
+  BackupError, backupFingerprint, backupKeySource, createBackup, readBackupFile, readBackupForRestore,
+  runScheduledBackup, saveBackupFile, startBackupScheduler, verifyBackup,
+} from './src/backup.js';
 import { seedIfEmpty, ensureSeedImages } from './src/seed.js';
 import { seedDirectory } from './src/seed-directory.js';
 import {
