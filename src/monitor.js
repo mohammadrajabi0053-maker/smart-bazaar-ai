@@ -8,6 +8,7 @@ export const SENSITIVE_ACTIONS = [
   'totp_disabled', 'backup_created', 'backup_restored', 'backup_verified',
   'backup_schedule_updated', 'recovery_codes_generated', 'passkey_registered',
   'passkey_removed', 'environment_changed', 'alert_config_updated',
+  'alert_acknowledged', 'event_acknowledged',
 ];
 
 export const SEVERITIES = ['info', 'medium', 'high', 'critical'];
