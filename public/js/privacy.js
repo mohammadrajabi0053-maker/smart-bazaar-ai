@@ -81,17 +81,15 @@ function renderRules() {
 }
 
 function fillCatalog(catalog) {
-  const lang = langOf();
-  const option = (row) => `<option value="${esc(row.slug || row.code)}">${esc(row[lang] || row.fa)}</option>`;
+  const index0 = li();
   const networkOptions = (catalog.networks || []).map((slug) => {
     const label = NETWORK_LABEL[slug];
-    return `<option value="${esc(slug)}">${esc(label ? label[index0()] : slug)}</option>`;
+    return `<option value="${esc(slug)}">${esc(label ? label[index0] : slug)}</option>`;
   }).join('');
   const formatOptions = (catalog.formats || []).map((slug) => {
     const label = FORMAT_LABEL[slug];
-    return `<option value="${esc(slug)}">${esc(label ? label[index0()] : slug)}</option>`;
+    return `<option value="${esc(slug)}">${esc(label ? label[index0] : slug)}</option>`;
   }).join('');
-  const index0 = () => li();
 
   $('#rCountry').innerHTML = countryOptions(catalog.countries || []);
   $('#rIndustry').innerHTML = industryOptions(catalog.industries || []);
