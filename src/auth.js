@@ -106,6 +106,11 @@ export function currentUser(req) {
   if (!session) return null;
   const user = getDb().users.find((u) => u.id === session.uid);
   if (!user || user.status === 'blocked') return null;
+  // ابطال همهٔ نشست‌های قدیمی (خروج از تمام دستگاه‌ها)
+  if (user.sessionFrom) {
+    const from = Date.parse(user.sessionFrom);
+    if (Number.isFinite(from) && Number(session.iat) < from) return null;
+  }
   return user;
 }
 

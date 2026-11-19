@@ -9,8 +9,18 @@ import {
   CATEGORIES, LANGS, ORDER_STATUSES, STATUS_FLOW, categoryLabel, isValidCategory,
 } from './src/catalog.js';
 import {
-  AdInputError, adOptions, adStats, buildQuote, campaignView, canTransition, invoiceFor, nextInvoiceNo,
+  AD_COUNTRIES, AdInputError, adOptions, adStats, buildQuote, campaignView, canTransition, invoiceFor, nextInvoiceNo,
 } from './src/ads.js';
+import {
+  ACCOUNTS, EXPENSE_SOURCES, FinanceError, GRANT_FIELDS, GRANT_PERMISSIONS, INCOME_SOURCES, WITHDRAWAL_STAGES,
+  advanceWithdrawal, appendEntry, audit, createGrant, createWithdrawal, decryptRecipient, ensureFinance,
+  ensureOwnerFlag, entriesToCsv, filterEntries, findGrantByToken, grantReport, grantStatus, grantView,
+  groupSeries, internalTransfer, isOwner, matchesFilter, recordAdsPipeline, recordStorefrontIncome,
+  registerFailedTotp, resetFailedTotp, seedDemoLedger, summarize, verifyChain, walletState,
+} from './src/finance.js';
+import {
+  decryptJson, encryptJson, newTotpSecret, otpauthUrl, randomToken, sha256, verifyTotp,
+} from './src/secure.js';
 import {
   getDb, saveDb, saveDbSoon, flushDb, id, ensureUploadDir, UPLOAD_DIR,
 } from './src/store.js';
@@ -230,6 +240,84 @@ export function createApp() {
 
   const authLimiter = createLimiter({ windowMs: 60000, max: 25 });
   const aiLimiter = createLimiter({ windowMs: 60000, max: 40 });
+  const financeLimiter = createLimiter({ windowMs: 60000, max: 90 });
+  const reportLimiter = createLimiter({ windowMs: 60000, max: 30 });
+
+  /* ------------------------- راه‌اندازی مالی (مالک) ------------------------- */
+
+  {
+    const db = getDb();
+    ensureFinance(db);
+    ensureOwnerFlag(db);
+    seedDemoLedger(db);
+    saveDbSoon();
+  }
+
+  const isDay = (value) => (/^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : null);
+
+  const safeIso = (value) => {
+    if (!value) return undefined;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+  };
+
+  const financeFail = (res, err) => {
+    if (err instanceof FinanceError) {
+      return res.status(err.status || 400).json({
+        error: err.code,
+        ...(err.availableUsd !== undefined ? { availableUsd: err.availableUsd } : {}),
+      });
+    }
+    throw err;
+  };
+
+  const deniedHtml = '<!doctype html><meta charset="utf-8"><title>403</title>'
+    + '<div style="font-family:system-ui;padding:2rem;text-align:center;line-height:2">'
+    + '<h1 style="font-size:1.3rem">دسترسی فقط برای مدیر اصلی مجاز است</h1>'
+    + '<p>Owner access only. This financial panel is restricted.</p>'
+    + '<p><a href="/admin">بازگشت به پنل مدیریت</a></p></div>';
+
+  const requireOwner = (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'auth_required' });
+    const db = getDb();
+    const finance = ensureFinance(db);
+    if (!isOwner(db, req.user)) {
+      finance.security.denied = (Number(finance.security.denied) || 0) + 1;
+      audit(db, {
+        actorId: req.user.id, actorRole: req.user.role, action: 'finance_access_denied',
+        target: req.path, meta: { method: req.method }, ip: req.ip,
+      });
+      saveDbSoon();
+      return res.status(403).json({ error: 'owner_only' });
+    }
+    return next();
+  };
+
+  // مرحلهٔ دوم امنیتی: رمز عبور مجدد + کد Authenticator
+  const verifySecondFactor = (req, db) => {
+    const finance = ensureFinance(db);
+    const failed = Number(finance.security.failedTotp) || 0;
+    if (failed >= 8) {
+      const last = finance.security.lastFailedAt ? Date.parse(finance.security.lastFailedAt) : 0;
+      if (Date.now() - last < 15 * 60000) return { ok: false, status: 429, error: 'too_many_attempts' };
+      finance.security.failedTotp = 0;
+    }
+    if (!verifyPassword(String(req.body?.password || ''), req.user.passwordHash)) {
+      audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'finance_password_failed', target: req.path, meta: {}, ip: req.ip });
+      saveDbSoon();
+      return { ok: false, status: 403, error: 'password_invalid' };
+    }
+    if (!req.user.totp?.enabled) return { ok: false, status: 409, error: 'totp_not_enabled' };
+    const stored = decryptJson(req.user.totp.secret);
+    if (!verifyTotp(stored?.secret, req.body?.code)) {
+      registerFailedTotp(db);
+      audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'finance_totp_failed', target: req.path, meta: {}, ip: req.ip });
+      saveDbSoon();
+      return { ok: false, status: 403, error: 'totp_invalid' };
+    }
+    resetFailedTotp(db);
+    return { ok: true };
+  };
 
   /* ---------------------------------- متا ---------------------------------- */
 
@@ -566,6 +654,7 @@ export function createApp() {
     }
 
     db.settings = { ...(db.settings || {}), orderSeq: seq };
+    for (const order of created) recordStorefrontIncome(db, order);
     saveDbSoon();
     res.status(201).json({
       groupId,
@@ -982,6 +1071,7 @@ export function createApp() {
       updatedAt: stamp,
     };
     db.adCampaigns.push(campaign);
+    recordAdsPipeline(db, campaign);
     saveDbSoon();
     res.status(201).json({ campaign: campaignView(campaign), invoice: invoiceFor(campaign) });
   });
@@ -1048,14 +1138,525 @@ export function createApp() {
     res.json({ campaign: campaignView(campaign), stats: adStats(db.adCampaigns) });
   });
 
+  /* --------------------------- مالی محرمانه (مالک) --------------------------- */
+
+  app.get('/api/finance/overview', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const includeDemo = req.query.includeDemo === '1';
+    const q = {
+      from: isDay(req.query.from),
+      to: isDay(req.query.to),
+      country: req.query.country || null,
+      source: req.query.source || null,
+      includeDemo,
+    };
+    const rows = ensureFinance(db).entries.filter((entry) => matchesFilter(entry, q));
+    const bucket = ['day', 'week', 'month', 'year'].includes(req.query.bucket) ? req.query.bucket : 'month';
+    res.json({
+      summary: summarize(rows),
+      series: groupSeries(rows, bucket),
+      wallet: walletState(db, { includeDemo }),
+      chain: verifyChain(db),
+      countries: AD_COUNTRIES.map((c) => ({ code: c.code, currency: c.currency, flag: c.flag, name: c.name })),
+      incomeSources: INCOME_SOURCES,
+      expenseSources: EXPENSE_SOURCES,
+      accounts: ACCOUNTS,
+      includeDemo,
+      bucket,
+      reportType: 'internal_management_report',
+      paymentsEnabled: false,
+      payoutEnabled: false,
+    });
+  });
+
+  app.get('/api/finance/entries', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    res.json(filterEntries(db, {
+      from: isDay(req.query.from),
+      to: isDay(req.query.to),
+      kind: req.query.kind || null,
+      source: req.query.source || null,
+      country: req.query.country || null,
+      currency: req.query.currency || null,
+      account: req.query.account || null,
+      q: req.query.q || null,
+      includeDemo: req.query.includeDemo === '1',
+      limit: req.query.limit,
+      offset: req.query.offset,
+    }));
+  });
+
+  app.post('/api/finance/entries', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const body = req.body || {};
+    const kind = body.kind === 'expense' ? 'expense' : 'income';
+    try {
+      const entry = appendEntry(db, {
+        kind,
+        source: clean(body.source, 30) || (kind === 'income' ? 'service' : 'operating'),
+        account: ACCOUNTS.some((a) => a.code === body.account) ? body.account : 'main',
+        amountUsd: toNumber(body.amountUsd, 0),
+        currency: clean(body.currency, 4).toUpperCase() || 'USD',
+        country: clean(body.country, 4).toUpperCase() || null,
+        settled: body.settled !== false,
+        note: cleanMultiline(body.note, 200),
+        at: safeIso(body.at),
+        actor: req.user.id,
+        idempotencyKey: clean(body.idempotencyKey, 80) || null,
+      });
+      audit(db, {
+        actorId: req.user.id, actorRole: req.user.role, action: `entry_created_${kind}`,
+        target: entry.id, meta: { amountUsd: entry.amountUsd, currency: entry.currency }, ip: req.ip,
+      });
+      saveDbSoon();
+      res.status(201).json({ entry, chain: verifyChain(db) });
+    } catch (err) {
+      financeFail(res, err);
+    }
+  });
+
+  app.get('/api/finance/wallet', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const finance = ensureFinance(db);
+    res.json({
+      wallet: walletState(db, { includeDemo: req.query.includeDemo === '1' }),
+      withdrawals: finance.withdrawals
+        .slice()
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .slice(0, 50),
+      stages: WITHDRAWAL_STAGES,
+      payoutEnabled: false,
+    });
+  });
+
+  app.post('/api/finance/transfers', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    try {
+      const result = internalTransfer(db, req.user, req.body || {});
+      saveDbSoon();
+      res.status(201).json({ ...result, wallet: walletState(db) });
+    } catch (err) {
+      financeFail(res, err);
+    }
+  });
+
+  app.post('/api/finance/withdrawals', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    try {
+      const withdrawal = createWithdrawal(db, req.user, req.body || {});
+      saveDbSoon();
+      res.status(201).json({ withdrawal, payoutEnabled: false, wallet: walletState(db) });
+    } catch (err) {
+      financeFail(res, err);
+    }
+  });
+
+  app.post('/api/finance/withdrawals/:id/:action', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const action = String(req.params.action);
+    if (!['review', 'approve', 'cancel'].includes(action)) {
+      return res.status(400).json({ error: 'action_invalid' });
+    }
+    if (action === 'approve') {
+      const second = verifySecondFactor(req, db);
+      if (!second.ok) return res.status(second.status).json({ error: second.error });
+    }
+    try {
+      const withdrawal = advanceWithdrawal(db, req.user, req.params.id, action, req.body || {});
+      saveDbSoon();
+      res.json({ withdrawal, payoutEnabled: false, wallet: walletState(db) });
+    } catch (err) {
+      financeFail(res, err);
+    }
+  });
+
+  app.get('/api/finance/reports', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const finance = ensureFinance(db);
+    res.json({
+      grants: finance.grants.slice().reverse().map((grant) => grantView(grant, db)),
+      sent: finance.sentReports.slice().reverse().slice(0, 50),
+      fields: GRANT_FIELDS,
+      permissions: GRANT_PERMISSIONS,
+      reportType: 'internal_management_report',
+    });
+  });
+
+  app.post('/api/finance/reports', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    try {
+      const { grant } = createGrant(db, req.user, req.body || {});
+      saveDbSoon();
+      res.status(201).json({ grant: grantView(grant, db) });
+    } catch (err) {
+      financeFail(res, err);
+    }
+  });
+
+  app.get('/api/finance/reports/:id', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const grant = ensureFinance(db).grants.find((g) => g.id === req.params.id);
+    if (!grant) return res.status(404).json({ error: 'not_found' });
+    res.json({
+      grant: grantView(grant, db),
+      report: grantReport(db, grant),
+      recipient: decryptRecipient(grant),
+      status: grantStatus(grant),
+    });
+  });
+
+  app.post('/api/finance/reports/:id/revoke', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const grant = ensureFinance(db).grants.find((g) => g.id === req.params.id);
+    if (!grant) return res.status(404).json({ error: 'not_found' });
+    grant.revoked = true;
+    grant.revokedAt = new Date().toISOString();
+    grant.revokedBy = req.user.id;
+    audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'grant_revoked', target: grant.trackingId, meta: {}, ip: req.ip });
+    saveDbSoon();
+    res.json({ grant: grantView(grant, db) });
+  });
+
+  // مرحلهٔ ۱ ارسال گزارش: ورود مجدد رمز + کد Authenticator
+  app.post('/api/finance/reports/:id/authorize', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const finance = ensureFinance(db);
+    const grant = finance.grants.find((g) => g.id === req.params.id);
+    if (!grant) return res.status(404).json({ error: 'not_found' });
+    const status = grantStatus(grant);
+    if (status !== 'active') return res.status(409).json({ error: 'grant_not_active', status });
+    const second = verifySecondFactor(req, db);
+    if (!second.ok) return res.status(second.status).json({ error: second.error });
+    const authorization = {
+      id: id(),
+      grantId: grant.id,
+      by: req.user.id,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 5 * 60000).toISOString(),
+      usedAt: null,
+    };
+    finance.authorizations.push(authorization);
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'report_authorized_step1',
+      target: grant.trackingId, meta: {}, ip: req.ip,
+    });
+    saveDbSoon();
+    res.json({
+      authorization: { id: authorization.id, expiresAt: authorization.expiresAt },
+      confirmation: {
+        recipient: decryptRecipient(grant),
+        recipientRole: grant.recipientRole,
+        reportType: 'internal_management_report',
+        trackingId: grant.trackingId,
+        permissions: grant.permissions,
+        fields: grant.fields,
+        amountUsd: grantReport(db, grant).amountUsd,
+        expiresAt: grant.expiresAt,
+      },
+    });
+  });
+
+  // مرحلهٔ ۲ ارسال گزارش: تأیید نهایی و صدور لینک رهگیری
+  app.post('/api/finance/reports/:id/send', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const finance = ensureFinance(db);
+    const grant = finance.grants.find((g) => g.id === req.params.id);
+    if (!grant) return res.status(404).json({ error: 'not_found' });
+    const status = grantStatus(grant);
+    if (status !== 'active') return res.status(409).json({ error: 'grant_not_active', status });
+    if (req.body?.confirm !== true) return res.status(400).json({ error: 'final_confirmation_required' });
+    const authorization = finance.authorizations.find(
+      (a) => a.id === String(req.body?.authorizationId || '') && a.grantId === grant.id,
+    );
+    if (!authorization) return res.status(403).json({ error: 'authorization_required' });
+    if (authorization.usedAt) return res.status(409).json({ error: 'authorization_used' });
+    if (Date.parse(authorization.expiresAt) < Date.now()) return res.status(403).json({ error: 'authorization_expired' });
+
+    const token = randomToken(24);
+    grant.tokenHash = sha256(token);
+    grant.sentAt = new Date().toISOString();
+    authorization.usedAt = grant.sentAt;
+    const recipient = decryptRecipient(grant);
+    finance.sentReports.push({
+      id: id(),
+      trackingId: grant.trackingId,
+      grantId: grant.id,
+      sentAt: grant.sentAt,
+      sentBy: req.user.id,
+      recipientEncrypted: grant.recipientEncrypted,
+      permissions: grant.permissions,
+      fields: grant.fields,
+      amountUsd: grantReport(db, grant).amountUsd,
+      expiresAt: grant.expiresAt,
+    });
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'report_sent',
+      target: grant.trackingId, meta: { grantId: grant.id, recipient: recipient.name }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.status(201).json({
+      trackingId: grant.trackingId,
+      token,
+      link: `/report/${token}`,
+      sentAt: grant.sentAt,
+      expiresAt: grant.expiresAt,
+      permissions: grant.permissions,
+    });
+  });
+
+  app.get('/api/finance/audit', requireOwner, financeLimiter, (req, res) => {
+    const finance = ensureFinance(getDb());
+    res.json({ events: finance.audit.slice(-200).reverse() });
+  });
+
+  app.get('/api/finance/export', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const format = String(req.query.format || 'csv');
+    const q = {
+      from: isDay(req.query.from),
+      to: isDay(req.query.to),
+      kind: req.query.kind || null,
+      source: req.query.source || null,
+      country: req.query.country || null,
+      currency: req.query.currency || null,
+      includeDemo: req.query.includeDemo === '1',
+    };
+    const rows = ensureFinance(db).entries.filter((entry) => matchesFilter(entry, q));
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'finance_exported',
+      target: format, meta: { count: rows.length }, ip: req.ip,
+    });
+    saveDbSoon();
+    if (format === 'csv') {
+      res.setHeader('content-type', 'text/csv; charset=utf-8');
+      res.setHeader('content-disposition', `attachment; filename="finance-ledger-${new Date().toISOString().slice(0, 10)}.csv"`);
+      return res.send(entriesToCsv(rows));
+    }
+    return res.json({ summary: summarize(rows), series: groupSeries(rows, 'month'), entries: rows.length });
+  });
+
+  /* --------------------------- امنیت و تیم مدیریتی --------------------------- */
+
+  app.get('/api/finance/security', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    const finance = ensureFinance(db);
+    res.json({
+      twoFactor: {
+        enabled: Boolean(req.user.totp?.enabled),
+        enabledAt: req.user.totp?.enabledAt || null,
+        requiredForReports: true,
+      },
+      encryption: { algorithm: 'aes-256-gcm', keySource: process.env.SESSION_SECRET ? 'env' : 'file' },
+      failedTotp: Number(finance.security.failedTotp) || 0,
+      lastFailedAt: finance.security.lastFailedAt || null,
+      deniedAttempts: Number(finance.security.denied) || 0,
+      chain: verifyChain(db),
+      backup: { mode: 'encrypted-json', automated: false, requiresPersistentDisk: true },
+      paymentsEnabled: false,
+      payoutEnabled: false,
+    });
+  });
+
+  app.post('/api/finance/security/2fa/setup', requireOwner, reportLimiter, (req, res) => {
+    const secret = newTotpSecret();
+    req.user.totpPending = encryptJson({ secret, createdAt: new Date().toISOString() });
+    saveDbSoon();
+    res.json({
+      secret,
+      otpauth: otpauthUrl(secret, req.user.email || 'owner@bazaar', 'Smart Bazaar'),
+      digits: 6,
+      period: 30,
+      algorithm: 'SHA1',
+    });
+  });
+
+  app.post('/api/finance/security/2fa/enable', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const pending = decryptJson(req.user.totpPending);
+    if (!pending?.secret) return res.status(400).json({ error: 'setup_required' });
+    if (!verifyTotp(pending.secret, req.body?.code)) {
+      registerFailedTotp(db);
+      saveDbSoon();
+      return res.status(403).json({ error: 'totp_invalid' });
+    }
+    req.user.totp = { enabled: true, secret: encryptJson({ secret: pending.secret }), enabledAt: new Date().toISOString() };
+    req.user.totpPending = null;
+    resetFailedTotp(db);
+    audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'totp_enabled', target: req.user.id, meta: {}, ip: req.ip });
+    saveDbSoon();
+    res.json({ twoFactor: { enabled: true, enabledAt: req.user.totp.enabledAt } });
+  });
+
+  app.post('/api/finance/security/2fa/disable', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const second = verifySecondFactor(req, db);
+    if (!second.ok) return res.status(second.status).json({ error: second.error });
+    req.user.totp = null;
+    req.user.totpPending = null;
+    audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'totp_disabled', target: req.user.id, meta: {}, ip: req.ip });
+    saveDbSoon();
+    res.json({ twoFactor: { enabled: false } });
+  });
+
+  app.post('/api/finance/security/logout-all', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    req.user.sessionFrom = new Date().toISOString();
+    saveDbSoon();
+    setSessionCookie(res, req.user);
+    audit(db, { actorId: req.user.id, actorRole: req.user.role, action: 'sessions_revoked', target: req.user.id, meta: {}, ip: req.ip });
+    res.json({ ok: true, sessionsRevokedAt: req.user.sessionFrom });
+  });
+
+  app.get('/api/finance/team', requireOwner, financeLimiter, (req, res) => {
+    const db = getDb();
+    res.json({
+      owner: { ...publicUser(req.user), owner: true, twoFactor: Boolean(req.user.totp?.enabled) },
+      team: db.users
+        .filter((user) => user.role === 'admin' && user.id !== req.user.id)
+        .map((user) => ({
+          ...publicUser(user), owner: user.owner === true, twoFactor: Boolean(user.totp?.enabled),
+        })),
+    });
+  });
+
+  app.post('/api/finance/team', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const name = clean(req.body?.name, 80);
+    const email = clean(req.body?.email, 120).toLowerCase();
+    const password = String(req.body?.password || '');
+    if (name.length < 3) return res.status(400).json({ error: 'name_required' });
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'email_invalid' });
+    if (password.length < 8) return res.status(400).json({ error: 'password_too_short' });
+    if (db.users.some((user) => user.email === email)) return res.status(409).json({ error: 'email_taken' });
+    const user = {
+      id: id(),
+      name,
+      email,
+      passwordHash: hashPassword(password),
+      role: 'admin',
+      owner: false,
+      status: 'active',
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    db.users.push(user);
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'sub_admin_created',
+      target: user.id, meta: { email }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.status(201).json({ user: { ...publicUser(user), owner: false } });
+  });
+
+  app.patch('/api/finance/team/:id', requireOwner, reportLimiter, (req, res) => {
+    const db = getDb();
+    const user = db.users.find((u) => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: 'not_found' });
+    if (user.owner === true) return res.status(409).json({ error: 'owner_protected' });
+    if (req.body?.status) user.status = req.body.status === 'active' ? 'active' : 'blocked';
+    user.updatedAt = new Date().toISOString();
+    audit(db, {
+      actorId: req.user.id, actorRole: req.user.role, action: 'sub_admin_updated',
+      target: user.id, meta: { status: user.status }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.json({ user: { ...publicUser(user), owner: user.owner === true } });
+  });
+
+  /* ------------------- گزارش اشتراکی (توکن‌محور، بدون مالک) ------------------- */
+
+  app.get('/api/finance/grants/:token', reportLimiter, (req, res) => {
+    const db = getDb();
+    const grant = findGrantByToken(db, req.params.token);
+    if (!grant) return res.status(404).json({ error: 'not_found' });
+    const status = grantStatus(grant);
+    if (status !== 'active') return res.status(403).json({ error: `grant_${status}` });
+    if (!grant.permissions.view) return res.status(403).json({ error: 'view_not_permitted' });
+    grant.views = (Number(grant.views) || 0) + 1;
+    audit(db, {
+      actorId: null, actorRole: 'recipient', action: 'grant_viewed',
+      target: grant.trackingId, meta: { views: grant.views }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.json({ grant: grantView(grant, db), report: grantReport(db, grant) });
+  });
+
+  app.get('/api/finance/grants/:token/export', reportLimiter, (req, res) => {
+    const db = getDb();
+    const grant = findGrantByToken(db, req.params.token);
+    if (!grant) return res.status(404).json({ error: 'not_found' });
+    const status = grantStatus(grant);
+    if (status !== 'active') return res.status(403).json({ error: `grant_${status}` });
+    const format = String(req.query.format || 'csv');
+    const allowed = format === 'csv'
+      ? (grant.permissions.excel || grant.permissions.copy)
+      : grant.permissions.pdf;
+    if (!allowed) return res.status(403).json({ error: 'download_not_permitted' });
+    const report = grantReport(db, grant);
+    grant.downloads = (Number(grant.downloads) || 0) + 1;
+    audit(db, {
+      actorId: null, actorRole: 'recipient', action: `grant_downloaded_${format}`,
+      target: grant.trackingId, meta: { format, downloads: grant.downloads }, ip: req.ip,
+    });
+    saveDbSoon();
+    if (format === 'csv') {
+      const rows = [
+        ['tracking_id', report.trackingId],
+        ['report_type', report.type],
+        ['base_income_usd', report.baseIncomeUsd],
+        ['share_percent', report.basis.percent ?? ''],
+        ['amount_usd', report.amountUsd],
+        ['expires_at', report.expiresAt],
+        ['disclaimer', report.disclaimer.en],
+      ];
+      const csv = `\uFEFF${rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\r\n')}\r\n`;
+      res.setHeader('content-type', 'text/csv; charset=utf-8');
+      res.setHeader('content-disposition', `attachment; filename="report-${report.trackingId}.csv"`);
+      return res.send(csv);
+    }
+    res.setHeader('content-disposition', `attachment; filename="report-${report.trackingId}.json"`);
+    return res.json(report);
+  });
+
+  app.post('/api/finance/grants/:token/events', reportLimiter, (req, res) => {
+    const db = getDb();
+    const grant = findGrantByToken(db, req.params.token);
+    if (!grant) return res.status(404).json({ error: 'not_found' });
+    const status = grantStatus(grant);
+    if (status !== 'active') return res.status(403).json({ error: `grant_${status}` });
+    const event = String(req.body?.event || '');
+    if (!['copy', 'print'].includes(event)) return res.status(400).json({ error: 'event_invalid' });
+    if (!grant.permissions[event]) return res.status(403).json({ error: `${event}_not_permitted` });
+    if (event === 'copy') grant.copies = (Number(grant.copies) || 0) + 1;
+    else grant.prints = (Number(grant.prints) || 0) + 1;
+    audit(db, {
+      actorId: null, actorRole: 'recipient', action: `grant_${event}`,
+      target: grant.trackingId, meta: { [event]: grant[`${event}s`] }, ip: req.ip,
+    });
+    saveDbSoon();
+    res.json({ ok: true, copies: grant.copies, prints: grant.prints });
+  });
+
   /* --------------------------------- فایل‌ها --------------------------------- */
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
+
+  app.use(['/finance.html', '/js/finance.js', '/css/finance.css'], (req, res, next) => {
+    if (!req.user) return res.redirect('/?next=/finance');
+    if (!isOwner(getDb(), req.user)) return res.status(403).type('html').send(deniedHtml);
+    return next();
+  });
 
   app.use(express.static(PUBLIC_DIR, { maxAge: '1h', extensions: ['html'] }));
   app.get('/seller', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'seller.html')));
   app.get('/admin', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
   app.get('/ads', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'ads.html')));
+  app.get('/finance', (req, res) => {
+    if (!req.user) return res.redirect('/?next=/finance');
+    if (!isOwner(getDb(), req.user)) return res.status(403).type('html').send(deniedHtml);
+    return res.sendFile(path.join(PUBLIC_DIR, 'finance.html'));
+  });
+  app.get('/report/:token', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'report.html')));
 
   app.use((req, res) => {
     if (req.accepts('html')) return res.status(404).sendFile(path.join(PUBLIC_DIR, '404.html'));
