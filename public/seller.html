@@ -55,6 +55,7 @@
       <button class="tab" data-tab="products" type="button" data-i18n="my_products">کالاهای من</button>
       <button class="tab" data-tab="orders" type="button" data-i18n="my_sales">سفارش‌های فروشگاه</button>
       <button class="tab" data-tab="ai" type="button" data-i18n="ai_tools">ابزارهای هوش مصنوعی</button>
+      <button class="tab" data-tab="profile" type="button">پروفایل کسب‌وکار</button>
     </div>
 
     <!-- داشبورد -->
@@ -99,6 +100,38 @@
           </tr></thead>
           <tbody id="orderRows"></tbody>
         </table></div>
+      </div>
+    </section>
+
+    <!-- پروفایل کسب‌وکار -->
+    <section id="tab-profile" hidden>
+      <div class="layout" style="grid-template-columns:1fr;padding:0">
+        <div class="panel">
+          <h3>🏷️ پروفایل کسب‌وکار</h3>
+          <p class="hint">این اطلاعات در بانک اصناف و پیش‌فاکتور تبلیغات نمایش داده می‌شود. شماره تأییدشده: <b id="pfPhone" dir="ltr">—</b></p>
+          <form id="profileForm">
+            <div class="field-row">
+              <div class="field"><label for="pfBusiness">نام کسب‌وکار</label><input id="pfBusiness" maxlength="80" required></div>
+              <div class="field"><label for="pfIndustry">صنف</label><select id="pfIndustry"></select></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="pfCountry">کشور</label><select id="pfCountry"></select></div>
+              <div class="field"><label for="pfProvince">استان</label><input id="pfProvince" maxlength="60"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="pfCity">شهر</label><input id="pfCity" maxlength="60" required></div>
+              <div class="field"><label for="pfWhatsapp">واتساپ کاری</label><input id="pfWhatsapp" dir="ltr" maxlength="20"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="pfTelegram">تلگرام</label><input id="pfTelegram" dir="ltr" maxlength="120"></div>
+              <div class="field"><label for="pfInstagram">اینستاگرام</label><input id="pfInstagram" dir="ltr" maxlength="120"></div>
+            </div>
+            <div class="field"><label for="pfWebsite">وب‌سایت</label><input id="pfWebsite" dir="ltr" placeholder="https://" maxlength="200"></div>
+            <div class="field"><label for="pfAddress">نشانی کسب‌وکار</label><textarea id="pfAddress" rows="2" maxlength="300"></textarea></div>
+            <button class="btn" type="submit">ذخیره پروفایل</button>
+            <p class="hint" id="profileStatus" role="status" aria-live="polite"></span></p>
+          </form>
+        </div>
       </div>
     </section>
 
