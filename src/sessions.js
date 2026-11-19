@@ -7,6 +7,10 @@ const MAX_SESSIONS_PER_USER = 20;
 const MAX_RECOVERY_CODES = 10;
 const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
+// انقضای نشست: سقف مطلق و سقف بیکاری (بدون فعالیت)
+export const SESSION_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
+export const SESSION_ABSOLUTE_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function sessionId() {
   return `ses_${crypto.randomBytes(9).toString('hex')}`;
 }
@@ -26,6 +30,7 @@ export function registerSession(db, user, { sid, ip = '', ua = '' } = {}) {
     ua: String(ua || '').slice(0, 180),
     createdAt: nowIso,
     lastSeenAt: nowIso,
+    expiresAt: new Date(Date.parse(nowIso) + SESSION_ABSOLUTE_MS).toISOString(),
     revokedAt: null,
   };
   list.push(row);
@@ -48,12 +53,37 @@ export function findSession(db, sid) {
   return db.sessions.find((row) => row.id === sid) || null;
 }
 
+export function sessionExpiry(row) {
+  const created = Date.parse(row?.createdAt || '') || Date.now();
+  const seen = Date.parse(row?.lastSeenAt || '') || created;
+  const absolute = Date.parse(row?.expiresAt || '') || created + SESSION_ABSOLUTE_MS;
+  return { absolute, idle: seen + SESSION_IDLE_MS };
+}
+
+export function sessionExpired(row, now = Date.now()) {
+  if (!row) return true;
+  const { absolute, idle } = sessionExpiry(row);
+  return now >= absolute || now >= idle;
+}
+
+// چرخش شناسهٔ نشست پس از عملیات حساس (جلوگیری از Session Fixation و استفادهٔ مجدد)
+export function rotateSession(db, user, oldSid, { ip = '', ua = '' } = {}) {
+  if (oldSid) revokeSession(db, user.id, oldSid, 'rotated');
+  return registerSession(db, user, { ip, ua });
+}
+
 let lastTouch = 0;
 
 export function touchSession(db, sid, { ip = '', ua = '' } = {}) {
   const row = findSession(db, sid);
   if (!row || row.revokedAt) return row;
   const nowMs = Date.now();
+  if (sessionExpired(row, nowMs)) {
+    row.revokedAt = new Date(nowMs).toISOString();
+    row.revokedReason = 'expired';
+    saveDbSoon();
+    return row;
+  }
   if (nowMs - lastTouch < 60000) return row;
   lastTouch = nowMs;
   row.lastSeenAt = new Date(nowMs).toISOString();
@@ -96,6 +126,10 @@ export function sessionView(row, currentSid = null) {
     createdAt: row.createdAt,
     lastSeenAt: row.lastSeenAt,
     revokedAt: row.revokedAt || null,
+    revokedReason: row.revokedReason || null,
+    expiresAt: new Date(sessionExpiry(row).absolute).toISOString(),
+    idleExpiresAt: new Date(sessionExpiry(row).idle).toISOString(),
+    expired: sessionExpired(row),
     active: !row.revokedAt,
   };
 }
