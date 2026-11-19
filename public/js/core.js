@@ -147,6 +147,9 @@ const DICT = {
   open_store: ['ورود به فروشگاه', 'Open store', 'فتح المتجر', 'Mağazayı aç'],
   no_data: ['داده‌ای نیست.', 'No data.', 'لا بيانات.', 'Veri yok.'],
   preview_banner: ['نسخهٔ پیش‌نمایش شاخهٔ appjet — برای بررسی شما', 'appjet branch preview — for your review', 'معاينة فرع appjet — للمراجعة', 'appjet dalı önizlemesi — incelemeniz için'],
+  invalid_credentials: ['ایمیل یا رمز عبور نادرست است.', 'Incorrect email or password.', 'البريد الإلكتروني أو كلمة المرور غير صحيحة.', 'E-posta veya şifre hatalı.'],
+  too_many_attempts: ['تلاش‌های ناموفق زیاد است؛ چند دقیقه بعد دوباره تلاش کنید.', 'Too many failed attempts. Please try again in a few minutes.', 'محاولات فاشلة كثيرة؛ حاول مرة أخرى بعد دقائق.', 'Çok fazla başarısız deneme. Lütfen birkaç dakika sonra tekrar deneyin.'],
+  csrf_invalid: ['درخواست معتبر نیست؛ صفحه را بازخوانی کنید.', 'Invalid request. Please reload the page.', 'الطلب غير صالح؛ أعد تحميل الصفحة.', 'Geçersiz istek. Lütfen sayfayı yenileyin.'],
 };
 
 let currentLang = (() => {
