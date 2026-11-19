@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=devic-width, initial-scale=1">
+<meta name="description" content="مرکز تبلیغات هوشمند — انتخاب کشور، ارز محل، رسانه، مدت و پیش‌فاکتور">
+<title>مرکز تبلیغات هوشمند | بازاز هوشمند</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📣</text></svg>">
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/ads.css">
+</head>
+<body class="ads-body">
+
+<header class="site-header">
+  <div class="container header-row">
+    <a class="brand" href="/">
+      <span class="logo">📣</span>
+      <span class="name" data-ad="brand">بازار هوشمند</span>
+    </a>
+    <div class="header-actions">
+      <a class="icon-btn" href="/" data-ad="nav_store">فروشگاه</a>
+      <a class="icon-btn" href="/seller" data-ad="nav_seller">پنل فروشنده</a>
+      <a class="icon-btn" href="/admin" data-ad="nav_admin">پنل مدیریت</a>
+      <select id="langSelect" class="lang-select" aria-label="زبان">
+        <option value="fa">فارسی</option>
+        <option value="en">English</option>
+        <option value="ar">العربیة</option>
+        <option value="tr">Türkçe</option>
+      </select>
+      <button class="icon-btn" id="authBtn" type="button">👤 <span id="authLabel">ورود</span></button>
+    </div>
+  </div>
+</header>
+
+<section class="ads-hero">
+  <div class="container">
+    <h1 data-ad="title">مرکز تبلیغات هوشمند</h1>
+    <p data-ad="sub">کمپین خود را بر اساس کشور، ارز محل، رسانه و مدت انتخاب کن و هزینه را هم به ارز محل و هم به دلار ببین.</p>
+    <div class="ads-bage">
+      <span class="ads-bage-item">🌍 <span data-ad="badge_countries">۹ کشور</span></span>
+      <span class="ads-bage-item">📣 <span data-ad="badge_media">۵ رسانه</span></span>
+      <span class="ads-bage-item">💱 <span data-ad="badge_currency">۱۰ ارز</span></span>
+      <span class="ads-bage-item">🧾 <span data-ad="badge_invoice">پیش‌فاکتور فوری</span></span>
+    </div>
+  </div>
+</section>
+
+<main class="container ads-main">
+  <div class="ads-notice" role="note">
+    <strong data-ad="notice_title">حالت پیش‌نمایش</strong>
+    <span data-ad="notice">پرداخت آنلاین و انتشار در شبکه‌های اجتماعی در این نسخه غیرفعال است؛ فقط محاسبهٔ هزینه، پیش‌فاکتور و ثبت سفارش انجام می‌شود.</span>
+  </div>
+
+  <div class="ads-grid">
+    <!-- فرم -->
+    <section class="panel ads-form">
+      <h2 data-ad="form_title">تنظیمات کمپین</h2>
+
+      <div class="field">
+        <label for="country" data-ad="country">کشور</label>
+        <select id="country"></select>
+      </div>
+
+      <div class="field">
+        <label for="currency" data-ad="currency">واحد پل</label>
+        <select id="currency"></select>
+        <p class="hint" id="currencyHint"></p>
+      </div>
+
+      <div class="field">
+        <label data-ad="media">رسانه انتشار</label>
+        <div class="ads-chips" id="mediaList"></div>
+        <p class="hint" data-ad="media_hint">حداکثر سه رسانه؛ هر رسانه خط جدای در پیش‌فاکتور دارد.</p>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="placement" data-ad="placement">محل انتشار</label>
+          <select id="placement"></select>
+        </div>
+        <div class="field">
+          <label for="creative" data-ad="creative">نوع محتوا</label>
+          <select id="creative"></select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="duration" data-ad="duration">مدت تبلیغ</label>
+          <select id="duration"></select>
+        </div>
+        <div class="field">
+          <label for="startDate" data-ad="start_date">تارخ شروع</label>
+          <input id="startDate" type="date">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="adTitle" data-ad="ad_title">عنوان تبلیغ</label>
+        <input id="adTitle" maxlength="120" data-ad-ph="ad_title_ph" placeholder="مثلاً: جمعهٔ ویژهٔ هدفون">
+      </div>
+
+      <div class="field">
+        <label for="adDesc" data-ad="ad_desc">توضیحات (اختیاری)</label>
+        <textarea id="adDesc" maxlength="1000" rows="3" data-ad-ph="ad_desc_ph" placeholder="محصول، مخاطب، پیام کلدی"></textarea>
+      </div>
+
+      <p class="hint" id="formHint"></p>
+    </section>
+
+    <!-- پیش‌فاکتور زنده -->
+    <aside class="panel ads-quote">
+      <div class="quote-head">
+        <h2 data-ad="quote_title">پیش‌فاکتور زنده</h2>
+        <span class="quote-live">● <span data-ad="live">زنده</span></span>
+      </div>
+      <div id="quoteBody" aria-live="polite"></div>
+      <div class="quote-actions">
+        <button class="btn secondary block" id="invoiceBtn" type="button" data-ad="get_invoice">دریافت پیش‌فاکتور</button>
+        <button class="btn block" id="submitBtn" type="button" data-ad="submit">ثبت سفارش تبلیغ</button>
+      </div>
+      <p class="hint" id="quoteHint"></p>
+    </aside>
+  </div>
+
+  <section class="panel" id="mineSection" hidden>
+    <h2 data-ad="mine">سفارش‌های تبلیغی من</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th data-ad="inv_no">شماره</th>
+          <th data-ad="ad_title">عنوان</th>
+          <th data-ad="country">کشور</th>
+          <th data-ad="duration">مدت</th>
+          <th data-ad="total">مبلغ</th>
+          <th data-ad="status">وضیعت</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="campaignRows"></tbody>
+      </table>
+    </div>
+    <p class="hint" id="mineEmpty" data-ad="none">هنوز سفارشی ثبت نکرده‌اید.</p>
+  </section>
+</main>
+
+<!-- مودال پیش‌فاکتور -->
+<div class="ads-overlay" id="invoiceModal" hidden>
+  <div class="ads-modal" role="dialog" aria-modal="true" aria-label="پیش‌فاکتور">
+    <div class="ads-modal-head">
+      <strong data-ad="invoice">پیش‌فاکتور</strong>
+      <button class="x-btn" type="button" data-close="invoiceModal" aria-label="بستن">✕</button>
+    </div>
+    <div class="ads-modal-body" id="invBody"></div>
+    <div class="ads-modal-foot">
+      <button class="btn secondary" type="button" id="printBtn" data-ad="print">چاپ</button>
+      <button class="btn" type="button" data-close="invoiceModal" data-ad="close">بستن</button>
+    </div>
+  </div>
+</div>
+
+<!-- مودال ورود -->
+<div class="ads-overlay" id="loginModal" hidden>
+  <div class="ads-modal small" role="dialog" aria-modal="true">
+    <div class="ads-modal-head">
+      <strong data-ad="login">ورود</strong>
+      <button class="x-btn" type="button" data-close="loginModal" aria-label="بستن">✕</button>
+    </div>
+    <div class="ads-modal-body">
+      <p class="hint" data-ad="login_hint">برای ثبت سفارش تبلیغ، با حساب خود وارِد شوید.</p>
+      <div class="field"><label for="lgEmail" data-ad="email">ایمیل</label><input id="lgEmail" type="email" autocomplate="email"></div>
+      <div class="field"><label for="lgPass" data-ad="password">رمز عبور</label><input id="lgPass" type="password" autocomplate="current-password"></div>
+      <p class="hint" id="loginHint"></p>
+    </div>
+    <div class="ads-modal-foot">
+      <button class="btn block" type="button" id="loginBtn" data-ad="login">ورود</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts"></div>
+
+<script type="module" src="/js/ads.js"></script>
+</body>
+</html>
