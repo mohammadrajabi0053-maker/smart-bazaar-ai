@@ -348,7 +348,7 @@ async function loadSessions() {
           <td>${esc(row.ip || '—')}</td>
           <td>${esc(time(row.createdAt))}</td>
           <td>${esc(time(row.lastSeenAt))}</td>
-          <td>${row.active ? 'فعال' : 'باطل‌شده'}</td>
+          <td>${row.active ? (row.expired ? 'منقضی' : 'فعال') : 'باطل‌شده'}${row.idleExpiresAt ? `<br><small>انقضا: ${esc(time(row.idleExpiresAt))}</small>` : ''}</td>
           <td>${row.active ? `<button class="fin-mini" data-revoke="${esc(row.id)}" type="button">ابطال</button>` : '—'}</td>
         </tr>`).join('')
       : '<tr><td colspan="6">نشستی ثبت نشده است.</td></tr>';
