@@ -1,5 +1,8 @@
 // بازار هوشمند — سیستم مالی مرکزی: دفتر تراکنش تغییرناپذیر، کیف پول، برداشت، مجوز گزارش و حسابرسی
-import { id } from './store.js';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { DATA_DIR, id } from './store.js';
 import { roundUsd, currencyMeta, resolveRates } from './money.js';
 import { AD_COUNTRIES } from './ads.js';
 import {
@@ -34,6 +37,67 @@ export const GRANT_FIELDS = ['totals', 'byCountry', 'bySource', 'byCurrency', 's
 export const GRANT_PERMISSIONS = ['view', 'copy', 'print', 'pdf', 'excel'];
 
 const GENESIS = '0'.repeat(64);
+const CHAIN_KEY_FILE = path.join(DATA_DIR, '.chain-key');
+const MAC_PREFIX = 'sb-chain-mac-v1';
+let cachedChainKey = null;
+
+export function chainKeySource() {
+  return String(process.env.CHAIN_HMAC_KEY || '').trim() ? 'env' : 'file';
+}
+
+/** کلید HMAC زنجیره؛ مستقل از SESSION_SECRET و کلید پشتیبان */
+export function chainKey() {
+  if (cachedChainKey) return cachedChainKey;
+  const fromEnv = String(process.env.CHAIN_HMAC_KEY || '').trim();
+  if (fromEnv) {
+    const buf = /^[0-9a-fA-F]{64}$/.test(fromEnv) ? Buffer.from(fromEnv, 'hex') : Buffer.from(fromEnv, 'utf8');
+    if (buf.length < 32) throw new FinanceError('chain_key_invalid', 500);
+    cachedChainKey = buf.subarray(0, 32);
+    return cachedChainKey;
+  }
+  try {
+    const raw = fs.readFileSync(CHAIN_KEY_FILE, 'utf8').trim();
+    const buf = /^[0-9a-fA-F]{64}$/.test(raw) ? Buffer.from(raw, 'hex') : Buffer.from(raw, 'base64');
+    if (buf.length >= 32) {
+      cachedChainKey = buf.subarray(0, 32);
+      return cachedChainKey;
+    }
+  } catch {
+    /* فایل کلید وجود ندارد → ساخته می‌شود */
+  }
+  const generated = crypto.randomBytes(32);
+  fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(CHAIN_KEY_FILE, generated.toString('hex'), { mode: 0o600 });
+  cachedChainKey = generated;
+  return cachedChainKey;
+}
+
+/** فقط برای آزمون‌ها */
+export function resetChainKeyCache() {
+  cachedChainKey = null;
+}
+
+export function chainFingerprint() {
+  return sha256(`sb-chain-fingerprint:${chainKey().toString('hex')}`).slice(0, 8);
+}
+
+/** نصب کلید زنجیره از کیت بازیابی (برای بازگرداندن پس از Redeploy) */
+export function installChainKey(hex) {
+  const clean = String(hex || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(clean)) throw new FinanceError('chain_key_invalid', 400);
+  fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(CHAIN_KEY_FILE, clean, { mode: 0o600 });
+  cachedChainKey = Buffer.from(clean, 'hex');
+  return chainFingerprint();
+}
+
+export function entryMac(entry, prevMac, keyBuf = null) {
+  const key = keyBuf || chainKey();
+  return crypto.createHmac('sha256', key)
+    .update(`${MAC_PREFIX}|${entry.seq}|${entry.hash}|${prevMac}`)
+    .digest('hex');
+}
+
 const HASH_FIELDS = [
   'seq', 'kind', 'source', 'account', 'amountUsd', 'amountLocal', 'currency', 'country',
   'rate', 'settled', 'demo', 'refType', 'refId', 'at', 'actor', 'note', 'prevHash',
@@ -104,15 +168,42 @@ export function chainHead(finance) {
   return finance.entries.length ? finance.entries[finance.entries.length - 1].hash : GENESIS;
 }
 
-export function verifyChain(db) {
+export function verifyChain(db, { keyHex = null } = {}) {
   const f = ensureFinance(db);
+  const keyBuf = /^[0-9a-f]{64}$/i.test(String(keyHex || '')) ? Buffer.from(String(keyHex), 'hex') : null;
   let prev = GENESIS;
+  let prevMac = GENESIS;
+  let signed = 0;
+  let legacy = 0;
+  let lastMac = null;
+  const fail = (entry, reason) => ({
+    valid: false, brokenAt: entry.seq, reason, entries: f.entries.length,
+    head: chainHead(f), signed, legacy, lastMac,
+  });
   for (const entry of f.entries) {
-    if (entry.prevHash !== prev) return { valid: false, brokenAt: entry.seq, reason: 'prev_hash_mismatch' };
-    if (entryHash(entry) !== entry.hash) return { valid: false, brokenAt: entry.seq, reason: 'hash_mismatch' };
+    if (entry.prevHash !== prev) return fail(entry, 'prev_hash_mismatch');
+    if (entryHash(entry) !== entry.hash) return fail(entry, 'hash_mismatch');
+    if (entry.mac) {
+      let expected;
+      try {
+        expected = entryMac(entry, prevMac, keyBuf);
+      } catch {
+        return fail(entry, 'chain_key_unavailable');
+      }
+      if (expected !== entry.mac) return fail(entry, 'mac_mismatch');
+      signed += 1;
+      lastMac = entry.mac;
+      prevMac = entry.mac;
+    } else {
+      legacy += 1;
+      prevMac = entry.hash;
+    }
     prev = entry.hash;
   }
-  return { valid: true, entries: f.entries.length, head: prev };
+  return {
+    valid: true, entries: f.entries.length, head: prev,
+    signed, legacy, lastMac, hmac: signed ? 'signed' : 'unsigned',
+  };
 }
 
 function localAmount(amountUsd, rate, decimals) {
@@ -163,6 +254,8 @@ export function appendEntry(db, input = {}) {
     prevHash: chainHead(f),
   };
   entry.hash = entryHash(entry);
+  const prevEntry = f.entries.length ? f.entries[f.entries.length - 1] : null;
+  entry.mac = entryMac(entry, prevEntry ? (prevEntry.mac || prevEntry.hash) : GENESIS);
   f.entries.push(entry);
   return entry;
 }
